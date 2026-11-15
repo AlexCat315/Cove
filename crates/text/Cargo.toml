@@ -11,6 +11,11 @@ cove-core.workspace = true
 unicode-segmentation.workspace = true
 unicode-general-category.workspace = true
 thiserror.workspace = true
+png = "0.18"
+ttf-parser = { version = "0.25", default-features = false, features = ["std"] }
+
+[target.'cfg(not(any(target_os = "macos", target_os = "ios")))'.dependencies]
+icu_properties = "2"
 
 [build-dependencies]
 cc.workspace = true

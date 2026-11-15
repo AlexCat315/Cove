@@ -31,6 +31,7 @@ members = [
     "crates/browser",
     "examples/gallery",
 ]
+exclude = ["third-party/ffmpeg-sys-next"]
 resolver = "3"
 
 [workspace.package]
@@ -68,7 +69,8 @@ cove-text = { path = "crates/text" }
 cove-imaging = { path = "crates/imaging" }
 cove-media = { path = "crates/media" }
 cove-media-rhi = { path = "crates/media-rhi" }
-ffmpeg-sys-next = { version = "=9.0.1", default-features = false, features = [
+# Cove's pinned build script also applies when Cargo resolves the SDK from a consumer workspace.
+ffmpeg-sys-next = { path = "third-party/ffmpeg-sys-next", default-features = false, features = [
     "build",
     # No `-march/-mtune=native`: shipped binaries must run on any CPU of the
     # target, and cl.exe does not understand the GCC flags.
@@ -152,8 +154,3 @@ workspace = true
 [profile.release]
 lto = "thin"
 codegen-units = 1
-
-# Pinned copy of ffmpeg-sys-next whose build script loads Cove's MSVC + MSYS2
-# setup environment in-process; upstream only sees the ambient process PATH.
-[patch.crates-io]
-ffmpeg-sys-next = { path = "third-party/ffmpeg-sys-next" }

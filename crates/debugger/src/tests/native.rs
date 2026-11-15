@@ -240,31 +240,6 @@ fn source_paths_lose_the_windows_verbatim_prefix() {
     );
 }
 
-const TICK_LINE: u32 = line!() + 4;
-
-#[inline(never)]
-fn tick(counter: u64) -> u64 {
-    let doubled = counter.wrapping_mul(2);
-    std::hint::black_box(doubled)
-}
-
-/// The debuggee for the source-level test: this test binary re-run with
-/// `COVE_DEBUGGEE` set. Without the variable it returns at once.
-#[test]
-#[ignore = "debuggee fixture, spawned by the source-level test"]
-fn debuggee_fixture() {
-    if std::env::var_os("COVE_DEBUGGEE").is_none() {
-        return;
-    }
-    let started = std::time::Instant::now();
-    let mut counter = 0u64;
-    while started.elapsed() < std::time::Duration::from_secs(90) {
-        counter = counter.wrapping_add(1);
-        std::hint::black_box(tick(counter));
-        std::thread::sleep(std::time::Duration::from_millis(20));
-    }
-}
-
 fn wait_for_stop(session: &NativeSession) -> crate::model::SessionSnapshot {
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
     loop {
@@ -279,15 +254,32 @@ fn wait_for_stop(session: &NativeSession) -> crate::model::SessionSnapshot {
 #[test]
 fn a_source_breakpoint_stops_with_real_locals_and_a_log_point_reports_values() {
     let Some(session) = native() else { return };
+    let fixture = tempfile::tempdir().expect("create the debuggee build directory");
+    let source = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/src/tests/fixtures/source_debuggee.rs"
+    );
+    let tick_line = include_str!("fixtures/source_debuggee.rs")
+        .lines()
+        .position(|line| line.contains("std::hint::black_box(doubled)"))
+        .expect("the fixture has a breakpoint line") as u32
+        + 1;
+    let executable = fixture
+        .path()
+        .join(format!("debuggee{}", std::env::consts::EXE_SUFFIX));
+    // Build a full-debug fixture even when the debugger itself is optimized.
+    let build = Command::new("rustc")
+        .args(["--edition=2024", "-g", "-C", "opt-level=0", source, "-o"])
+        .arg(&executable)
+        .output()
+        .expect("compile the source debuggee");
+    assert!(
+        build.status.success(),
+        "{}",
+        String::from_utf8_lossy(&build.stderr)
+    );
     let target = Disposable(
-        Command::new(std::env::current_exe().unwrap())
-            .args([
-                "--exact",
-                "tests::native::debuggee_fixture",
-                "--ignored",
-                "--test-threads=1",
-            ])
-            .env("COVE_DEBUGGEE", "1")
+        Command::new(executable)
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::null())
@@ -298,14 +290,12 @@ fn a_source_breakpoint_stops_with_real_locals_and_a_log_point_reports_values() {
         eprintln!("attach was refused; skipping: {}", error.message());
         return;
     }
-    let source = concat!(env!("CARGO_MANIFEST_DIR"), "/src/tests/native.rs");
-
     let listed = session
-        .set_source_breakpoint(source, TICK_LINE, None, None)
+        .set_source_breakpoint(source, tick_line, None, None)
         .unwrap();
     assert!(
         listed[0].verified,
-        "the line table resolves {source}:{TICK_LINE}"
+        "the line table resolves {source}:{tick_line}"
     );
     let id = listed[0].id.unwrap();
 
@@ -318,9 +308,9 @@ fn a_source_breakpoint_stops_with_real_locals_and_a_log_point_reports_values() {
     let stack = session.stack_trace(None, 0, 4).unwrap();
     let frame = &stack.frames[0];
     assert!(frame.name.contains("tick"), "{}", frame.name);
-    assert_eq!(frame.line, Some(TICK_LINE));
+    assert_eq!(frame.line, Some(tick_line));
     let path = frame.source.as_ref().unwrap().path.as_deref().unwrap();
-    assert!(path.ends_with("native.rs"), "{path}");
+    assert!(path.ends_with("source_debuggee.rs"), "{path}");
 
     let scopes = session.scopes(frame.id).unwrap();
     let mut visible = Vec::new();
@@ -344,7 +334,7 @@ fn a_source_breakpoint_stops_with_real_locals_and_a_log_point_reports_values() {
     // A log point reports the value and never leaves the debuggee stopped.
     session.clear_breakpoints(source, None).unwrap();
     session
-        .set_source_breakpoint(source, TICK_LINE, None, Some("counter={counter}"))
+        .set_source_breakpoint(source, tick_line, None, Some("counter={counter}"))
         .unwrap();
     assert_ne!(session.resume().unwrap().state, SessionState::Stopped);
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);

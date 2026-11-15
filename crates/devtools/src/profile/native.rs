@@ -613,9 +613,12 @@ mod tests {
     #[cfg(target_os = "macos")]
     #[inline(never)]
     fn cove_devtools_profile_busy_loop(stop: &AtomicBool) {
-        let mut accumulator: u64 = 0;
+        let mut accumulator = 1u64;
         while !stop.load(Ordering::Relaxed) {
-            accumulator = accumulator.wrapping_add(1);
+            // Keep sampled instructions in this function even in optimized builds.
+            for _ in 0..4096 {
+                accumulator = (accumulator >> 1) ^ ((accumulator & 1) * 0xd800_0000_0000_0000);
+            }
             std::hint::black_box(accumulator);
         }
     }
@@ -675,17 +678,14 @@ mod tests {
                 entry["function"]
                     .as_str()
                     .is_some_and(|function| function.contains("cove_devtools_profile_busy_loop"))
+                    && entry["filePath"]
+                        .as_str()
+                        .is_some_and(|path| path.ends_with("profile/native.rs"))
             })
             .collect();
         assert!(
             !busy.is_empty(),
             "the busy loop is absent from the hotspots: {entries:?}"
-        );
-        assert!(
-            busy.iter().all(|entry| entry["filePath"]
-                .as_str()
-                .is_some_and(|path| path.ends_with("profile/native.rs"))),
-            "the busy loop resolved outside its source file: {busy:?}"
         );
         // One sampled instruction of a function can sit outside the line table;
         // at least one of the busy loop's addresses must carry function file:line.

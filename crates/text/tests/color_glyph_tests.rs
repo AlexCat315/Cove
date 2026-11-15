@@ -110,9 +110,11 @@ fn emoji_sequences_keep_their_cluster_and_rasterize_color_ink() {
             .filter(|offset| payload.pixels[offset + 3] > 0)
             .collect();
         assert!(!visible.is_empty(), "{text:?} rasterized no visible pixels");
-        // Fonts without a flag ligature can draw the regional indicators
-        // separately as monochrome letters.
-        if text != "\u{1F1E8}\u{1F1F3}" || shaped.len() == 1 {
+        // Some fonts use a monochrome silhouette for family emoji. Fonts
+        // without a flag ligature can also draw its regional indicators separately.
+        let family = text == "\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}\u{200D}\u{1F466}";
+        let separate_flag = text == "\u{1F1E8}\u{1F1F3}" && shaped.len() != 1;
+        if !family && !separate_flag {
             assert!(
                 visible.iter().any(|offset| {
                     (payload.pixels[*offset] as i32 - payload.pixels[*offset + 2] as i32).abs() > 30

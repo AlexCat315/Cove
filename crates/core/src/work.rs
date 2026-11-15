@@ -447,9 +447,23 @@ mod tests {
             squares,
             items.iter().map(|value| value * value).collect::<Vec<_>>()
         );
-        let threads = par_map(&items, |_| std::thread::current().id());
+        let caller = std::thread::current().id();
+        let worker_seen = std::sync::atomic::AtomicBool::new(false);
+        let waits_for_worker = pool().threads() >= 2;
+        let threads = par_map(&items, |value| {
+            let current = std::thread::current().id();
+            if current != caller {
+                worker_seen.store(true, Ordering::Release);
+            } else if *value == 0 && waits_for_worker {
+                let deadline = Instant::now() + Duration::from_secs(2);
+                while !worker_seen.load(Ordering::Acquire) && Instant::now() < deadline {
+                    std::thread::sleep(Duration::from_millis(1));
+                }
+            }
+            current
+        });
         let distinct: std::collections::HashSet<_> = threads.into_iter().collect();
-        assert!(distinct.len() > 1 || pool().threads() < 2);
+        assert!(!waits_for_worker || distinct.iter().any(|thread| *thread != caller));
     }
 
     #[test]

@@ -16,8 +16,7 @@ pub use cove_devtools as devtools;
 pub use cove_hosts as hosts;
 pub use cove_hosts::{
     ApplicationCheckpoint, ApplicationConfiguration, ApplicationLaunch, NativeMenu,
-    NativeMenuAction, NativeMenuBar, NativeMenuItem, NativeMenuKeyModifiers,
-    application,
+    NativeMenuAction, NativeMenuBar, NativeMenuItem, NativeMenuKeyModifiers, application,
 };
 pub use cove_terminal as terminal;
 pub use cove_ui_addons as addons;

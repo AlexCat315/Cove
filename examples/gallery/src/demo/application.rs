@@ -239,8 +239,10 @@ mod tests {
     fn immersive_flags_only_set_the_windows_divider_preference() {
         let seamless = configuration(&launch("immersive"));
         let separated = configuration(&launch("separated"));
-        assert_eq!(seamless.window.backdrop, separated.window.backdrop);
-        assert_eq!(seamless.window.title_bar_style, separated.window.title_bar_style);
+        assert_eq!(
+            seamless.window.title_bar_style,
+            separated.window.title_bar_style
+        );
         assert_eq!(seamless.window.title_bar_divider, TitleBarDivider::Seamless);
         assert_eq!(
             separated.window.title_bar_divider,

@@ -7,13 +7,14 @@
 
 use cove_alloc::{AllocationSnapshot, TrackingAllocator};
 use std::alloc::{Layout, alloc, alloc_zeroed, dealloc, realloc};
+use std::hint::black_box;
 
 #[global_allocator]
 static ALLOC: TrackingAllocator = TrackingAllocator::new();
 
 fn main() {
     // Windows can reach main before Rust makes a heap allocation.
-    drop(std::hint::black_box(Box::new(0u8)));
+    drop(black_box(Box::new(0u8)));
     let startup =
         cove_alloc::snapshot().expect("the tracking allocator counted the first allocation");
     assert!(cove_alloc::installed());
@@ -46,7 +47,7 @@ fn allocation_raises_counters(startup: &AllocationSnapshot) {
     const SIZE: usize = 1 << 20;
     let layout = Layout::from_size_align(SIZE, 8).expect("valid layout");
     // SAFETY: the layout has a non-zero size.
-    let pointer = unsafe { alloc(layout) };
+    let pointer = black_box(unsafe { alloc(layout) });
     assert!(!pointer.is_null(), "the system allocator must serve 1 MiB");
 
     let during = cove_alloc::snapshot().expect("counters stay installed");
@@ -77,7 +78,7 @@ fn allocation_raises_counters(startup: &AllocationSnapshot) {
 fn release_lowers_current_bytes() {
     let layout = Layout::from_size_align(4096, 16).expect("valid layout");
     // SAFETY: the layout has a non-zero size.
-    let pointer = unsafe { alloc(layout) };
+    let pointer = black_box(unsafe { alloc(layout) });
     assert!(!pointer.is_null());
     let held = cove_alloc::snapshot().expect("counters stay installed");
 
@@ -116,7 +117,7 @@ fn reallocation_moves_bytes_between_classes() {
     let baseline = cove_alloc::snapshot().expect("counters stay installed");
     let small = Layout::from_size_align(1024, 16).expect("valid layout");
     // SAFETY: the layout has a non-zero size.
-    let pointer = unsafe { alloc(small) };
+    let pointer = black_box(unsafe { alloc(small) });
     assert!(!pointer.is_null());
     let before = cove_alloc::snapshot().expect("counters stay installed");
     assert_eq!(
@@ -131,7 +132,7 @@ fn reallocation_moves_bytes_between_classes() {
 
     // SAFETY: `pointer` came from `alloc` with `small`, and the new size keeps
     // the same alignment.
-    let grown = unsafe { realloc(pointer, small, 8192) };
+    let grown = black_box(unsafe { realloc(pointer, small, 8192) });
     assert!(!grown.is_null());
     let after_grow = cove_alloc::snapshot().expect("counters stay installed");
     assert_eq!(
@@ -176,7 +177,7 @@ fn reallocation_moves_bytes_between_classes() {
 
     let large = Layout::from_size_align(8192, 16).expect("valid layout");
     // SAFETY: `grown` came from `realloc` with `small` and the new size 8192.
-    let shrunk = unsafe { realloc(grown, large, 512) };
+    let shrunk = black_box(unsafe { realloc(grown, large, 512) });
     assert!(!shrunk.is_null());
     let after_shrink = cove_alloc::snapshot().expect("counters stay installed");
     assert_eq!(
@@ -200,7 +201,7 @@ fn zeroed_allocation_is_counted() {
     let baseline = cove_alloc::snapshot().expect("counters stay installed");
     let layout = Layout::from_size_align(65_536, 32).expect("valid layout");
     // SAFETY: the layout has a non-zero size.
-    let pointer = unsafe { alloc_zeroed(layout) };
+    let pointer = black_box(unsafe { alloc_zeroed(layout) });
     assert!(!pointer.is_null());
     let during = cove_alloc::snapshot().expect("counters stay installed");
     assert_eq!(

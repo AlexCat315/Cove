@@ -194,6 +194,9 @@ impl FontFace {
     pub fn face_index(&self) -> u16 {
         self.0.selector.face_index()
     }
+    pub(crate) fn font_bytes(&self) -> &[u8] {
+        &self.0.storage
+    }
     pub fn applied_design_coordinates(&self) -> &BTreeMap<FontAxisId, f64> {
         &self.0.coordinates
     }
@@ -268,6 +271,9 @@ impl FontFace {
         #[cfg(any(target_os = "macos", target_os = "ios"))]
         if let Some(font) = self.native_color_font() {
             return Some(font.source());
+        }
+        if let Some(source) = crate::bitmap_color_glyphs::source(self) {
+            return Some(source);
         }
         crate::free_type_color_glyphs::FreeTypeColorGlyphFace::new(self.clone())
             .map(|face| face.source())

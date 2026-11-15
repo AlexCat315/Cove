@@ -1,4 +1,5 @@
 //! Text implementation translated from CoveUIText. Native font handles remain private.
+mod bitmap_color_glyphs;
 mod color_glyph_atlas;
 mod color_glyph_source;
 mod draw_list_text;

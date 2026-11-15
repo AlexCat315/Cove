@@ -26,7 +26,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.1
         with:
-          ref: ${{ inputs.tag || github.ref }}
+          ref: ${{ inputs.tag || github.sha }}
       - name: Audit source layout and migration mappings
         run: cargo run --locked --quiet -p cove-package --bin cove-package -- audit --json
       - name: Verify release metadata
@@ -46,6 +46,10 @@ jobs:
     needs: metadata
     env:
       CARGO_PROFILE_RELEASE_DEBUG: "1"
+      # The source-only release exercises optimized code without whole-program
+      # LTO across each integration-test executable.
+      CARGO_PROFILE_RELEASE_LTO: "false"
+      CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "16"
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -57,7 +61,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.1
         with:
-          ref: ${{ inputs.tag || github.ref }}
+          ref: ${{ inputs.tag || github.sha }}
       - uses: ./.github/actions/fetch-submodules
       - uses: ./.github/actions/setup-toolchains
       - name: Test workspace
@@ -86,7 +90,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.1
         with:
-          ref: ${{ inputs.tag || github.ref }}
+          ref: ${{ inputs.tag || github.sha }}
       - uses: ./.github/actions/fetch-submodules
       - uses: ./.github/actions/setup-toolchains
       - uses: android-actions/setup-android@v3
@@ -117,7 +121,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.1
         with:
-          ref: ${{ inputs.tag || github.ref }}
+          ref: ${{ inputs.tag || github.sha }}
       - name: Publish the SDK release
         env:
           GH_TOKEN: ${{ github.token }}

@@ -7,6 +7,7 @@
 #include FT_MULTIPLE_MASTERS_H
 #include <hb.h>
 #include <hb-ft.h>
+#include <hb-ot.h>
 #include <limits.h>
 #include <math.h>
 #include <stdlib.h>
@@ -17,9 +18,11 @@ static char *copy_string(const char *text) { if (!text) text=""; const size_t n=
 void cove_text_free(void *memory) { free(memory); }
 void *cove_text_library_new(void) { FT_Library library=NULL; return FT_Init_FreeType(&library)==0 ? library : NULL; }
 void cove_text_library_free(void *library) { if (library) FT_Done_FreeType(library); }
+static int ensure_color(CoveFace *face);
 static int requested_size(CoveFace *face) {
-    const int result=FT_Set_Char_Size(face->face,0,(FT_F26Dot6)(face->size*face->scale*64),72,72);
-    face->color_active=0; face->strike_scale=1; return result;
+    face->color_active=0; face->strike_scale=1;
+    if (!FT_IS_SCALABLE(face->face) && FT_HAS_COLOR(face->face)) return ensure_color(face) ? 0 : 1;
+    return FT_Set_Char_Size(face->face,0,(FT_F26Dot6)(face->size*face->scale*64),72,72);
 }
 void *cove_text_face_new(void *library,const uint8_t *bytes,size_t length,uint32_t selector,float size,float scale) {
     if (!library || !bytes || !length || length>LONG_MAX || !isfinite(size) || size<=0 || size>512 || !isfinite(scale) || scale<1 || scale>4) return NULL;
@@ -27,9 +30,24 @@ void *cove_text_face_new(void *library,const uint8_t *bytes,size_t length,uint32
     if (FT_New_Memory_Face(library,bytes,(FT_Long)length,(FT_Long)(selector&0xffffu),&owned->face)) { free(owned); return NULL; }
     if ((selector>>16) && FT_Set_Named_Instance(owned->face,selector>>16)) { FT_Done_Face(owned->face); free(owned); return NULL; }
     FT_Select_Charmap(owned->face,FT_ENCODING_UNICODE); requested_size(owned);
-    owned->font=hb_ft_font_create_referenced(owned->face);
+    const int bitmap_color=owned->color_active && !FT_IS_SCALABLE(owned->face);
+    if (bitmap_color) {
+        hb_face_t *hb_face=hb_ft_face_create_referenced(owned->face);
+        owned->font=hb_font_create(hb_face);
+        hb_face_destroy(hb_face);
+    } else {
+        owned->font=hb_ft_font_create_referenced(owned->face);
+    }
     if (!owned->font) { FT_Done_Face(owned->face); free(owned); return NULL; }
-    hb_ft_font_set_load_flags(owned->font,FT_LOAD_NO_HINTING|FT_LOAD_NO_BITMAP); hb_ft_font_changed(owned->font); return owned;
+    if (bitmap_color) {
+        hb_ot_font_set_funcs(owned->font);
+        const int units=(int)roundf(size*scale*64);
+        hb_font_set_scale(owned->font,units,units);
+    } else {
+        hb_ft_font_set_load_flags(owned->font,FT_LOAD_NO_HINTING|FT_LOAD_NO_BITMAP);
+        hb_ft_font_changed(owned->font);
+    }
+    return owned;
 }
 void cove_text_face_free(void *value) { if (!value) return; CoveFace *face=value; hb_font_destroy(face->font); FT_Done_Face(face->face); free(face); }
 const char *cove_text_face_name(void *value) { const char *name=FT_Get_Postscript_Name(((CoveFace*)value)->face); return name ? name : ""; }
@@ -37,7 +55,12 @@ int cove_text_face_color(void *value) { return FT_HAS_COLOR(((CoveFace*)value)->
 int cove_text_face_size(void *value,float size,float scale) {
     if (!isfinite(size) || size<=0 || size>512 || !isfinite(scale) || scale<1 || scale>4) return 0;
     CoveFace *face=value; const float old_size=face->size,old_scale=face->scale; face->size=size; face->scale=scale;
-    if (requested_size(face)) { face->size=old_size; face->scale=old_scale; requested_size(face); return 0; } hb_ft_font_changed(face->font); return 1;
+    if (requested_size(face)) { face->size=old_size; face->scale=old_scale; requested_size(face); return 0; }
+    if (face->color_active && !FT_IS_SCALABLE(face->face)) {
+        const int units=(int)roundf(size*scale*64);
+        hb_font_set_scale(face->font,units,units);
+    } else hb_ft_font_changed(face->font);
+    return 1;
 }
 uint32_t cove_text_glyph_index(void *value,uint32_t scalar) { return FT_Get_Char_Index(((CoveFace*)value)->face,scalar); }
 int64_t cove_text_probe(void *library,const uint8_t *bytes,size_t length,const char *name) {
@@ -84,7 +107,7 @@ int cove_text_apply_axes(void *value,const uint32_t *tags,const double *values,s
     const int status=FT_Set_Var_Design_Coordinates(face->face,axes->num_axis,coordinates);
     free(coordinates); FT_Done_MM_Var(face->library,axes); hb_ft_font_changed(face->font); return status==0;
 }
-static void ensure_normal(CoveFace *face) { if (face->color_active) { requested_size(face); hb_ft_font_changed(face->font); } }
+static void ensure_normal(CoveFace *face) { if (face->color_active && FT_IS_SCALABLE(face->face)) { requested_size(face); hb_ft_font_changed(face->font); } }
 static int ensure_color(CoveFace *face) {
     if (!FT_HAS_COLOR(face->face)) return 0;
     if (face->color_active) return 1;
@@ -119,7 +142,7 @@ int cove_text_glyph_metrics(void *value,uint32_t glyph,int layout,CoveGlyphMetri
 CoveLineMetrics cove_text_line_metrics(void *value,int color) {
     CoveFace *face=value; if (color==1) ensure_color(face); else ensure_normal(face);
     if (!face->face->size) return (CoveLineMetrics){face->size*0.8f,face->size*0.2f,face->size*1.2f};
-    const FT_Size_Metrics metrics=face->face->size->metrics; const float unit=(color==1 ? face->strike_scale : 1)/face->scale;
+    const FT_Size_Metrics metrics=face->face->size->metrics; const float unit=face->strike_scale/face->scale;
     const float ascent=(float)metrics.ascender/64*unit,descent=(float)-metrics.descender/64*unit,height=(float)metrics.height/64*unit;
     return (CoveLineMetrics){ascent,descent,color==2 ? height : fmaxf(height,ascent+descent)};
 }

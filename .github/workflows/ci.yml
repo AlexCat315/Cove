@@ -168,7 +168,8 @@ jobs:
         run: |
           cp -R Tools/MediaSmoke "$RUNNER_TEMP/cove-media-consumer"
           cd "$RUNNER_TEMP/cove-media-consumer"
-          sed "s|path = \"../../crates/media\"|path = \"$GITHUB_WORKSPACE/crates/media\"|" Cargo.toml > Cargo.toml.next
+          workspace=$(cygpath -m "$GITHUB_WORKSPACE")
+          sed "s|path = \"../../crates/media\"|path = \"$workspace/crates/media\"|" Cargo.toml > Cargo.toml.next
           mv Cargo.toml.next Cargo.toml
           cargo build
           cargo test

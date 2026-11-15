@@ -354,15 +354,42 @@ impl FontProvider {
     }
     #[cfg(not(any(target_os = "macos", target_os = "ios")))]
     fn fallback_font(&mut self, cluster: &str, primary: &Rc<ManagedFont>) -> Rc<ManagedFont> {
+        use icu_properties::{
+            CodePointSetData,
+            props::{DefaultIgnorableCodePoint, EmojiPresentation},
+        };
+
+        let emoji = !cluster.is_ascii()
+            && !cluster.contains('\u{fe0e}')
+            && (cluster.contains('\u{fe0f}')
+                || cluster.chars().next().is_some_and(|first| {
+                    CodePointSetData::new::<EmojiPresentation>().contains(first)
+                }));
+        if emoji {
+            let ignorable = CodePointSetData::new::<DefaultIgnorableCodePoint>();
+            let covers = |font: &ManagedFont| {
+                font.face.has_color_glyphs()
+                    && cluster.chars().all(|scalar| {
+                        ignorable.contains(scalar) || font.face.glyph_index(scalar) != 0
+                    })
+            };
+            if covers(primary) {
+                return primary.clone();
+            }
+            if let Some(font) = self.find_fallback(covers) {
+                return font;
+            }
+        }
         if primary.face.can_render(cluster) {
             return primary.clone();
         }
-        if let Some(font) = self
-            .fallback_chain
-            .iter()
-            .find(|font| font.face.can_render(cluster))
-        {
-            return font.clone();
+        self.find_fallback(|font| font.face.can_render(cluster))
+            .unwrap_or_else(|| primary.clone())
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "ios")))]
+    fn find_fallback(&mut self, covers: impl Fn(&ManagedFont) -> bool) -> Option<Rc<ManagedFont>> {
+        if let Some(font) = self.fallback_chain.iter().find(|font| covers(font)) {
+            return Some(font.clone());
         }
         for path in self.fallback_paths.clone() {
             if !self.tried_paths.insert(path.clone()) {
@@ -371,12 +398,12 @@ impl FontProvider {
             let alias = format!("fallback:{}", path.display());
             if let Some(font) = self.load_direct(&path, &alias) {
                 self.fallback_chain.push(font.clone());
-                if font.face.can_render(cluster) {
-                    return font;
+                if covers(&font) {
+                    return Some(font);
                 }
             }
         }
-        primary.clone()
+        None
     }
     #[cfg(any(target_os = "macos", target_os = "ios"))]
     fn load_apple_font(&mut self, native: AppleFont) -> Option<Rc<ManagedFont>> {
@@ -584,6 +611,7 @@ fn system_fallback_paths() -> Vec<PathBuf> {
     #[cfg(target_os = "android")]
     {
         let mut paths = [
+            "/system/fonts/NotoColorEmoji.ttf",
             "/system/fonts/NotoSansCJK-Regular.ttc",
             "/system/fonts/NotoSansSymbols-Regular-Subsetted.ttf",
             "/system/fonts/NotoSansSymbols-Regular-Subsetted2.ttf",
@@ -600,6 +628,9 @@ fn system_fallback_paths() -> Vec<PathBuf> {
     #[cfg(target_os = "linux")]
     {
         [
+            "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf",
+            "/usr/share/fonts/google-noto-emoji/NotoColorEmoji.ttf",
+            "/usr/share/fonts/noto/NotoColorEmoji.ttf",
             "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
             "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",
             "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",

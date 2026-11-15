@@ -135,7 +135,7 @@ fn real_sampling(probe: &mut RuntimeProbe) {
     );
 
     let symbols_available = stopped["symbolizationReason"].is_null();
-    let mut busy_site_seen = false;
+    let mut busy_site_bytes = 0;
     for site in sites {
         assert!(
             site["bytes"].as_u64().unwrap() > 0,
@@ -167,17 +167,13 @@ fn real_sampling(probe: &mut RuntimeProbe) {
                 .iter()
                 .any(|frame| names_busy_allocation(frame) || is_this_test_file(frame))
         {
-            busy_site_seen = true;
-            assert!(
-                site["bytes"].as_u64().unwrap() >= (BUSY_ALLOCATIONS * BUSY_SIZE) as u64,
-                "the busy site's bytes come from the busy loop"
-            );
+            busy_site_bytes += site["bytes"].as_u64().unwrap();
         }
     }
     if symbols_available {
         assert!(
-            busy_site_seen,
-            "the busy loop's allocation site is among the resolved sites"
+            busy_site_bytes >= (BUSY_ALLOCATIONS * BUSY_SIZE) as u64,
+            "the resolved allocation sites include the busy loop's bytes: {busy_site_bytes}"
         );
         assert!(
             sites.iter().any(|site| {
@@ -314,7 +310,7 @@ fn names_busy_allocation(frame: &serde_json::Value) -> bool {
 fn is_this_test_file(frame: &serde_json::Value) -> bool {
     frame["filePath"]
         .as_str()
-        .is_some_and(|path| path.ends_with("tests/allocation_sites.rs"))
+        .is_some_and(|path| std::path::Path::new(path).ends_with("tests/allocation_sites.rs"))
 }
 
 #[inline(never)]
@@ -323,7 +319,7 @@ fn busy_allocations() {
     for _ in 0..BUSY_ALLOCATIONS {
         // SAFETY: the layout has non-zero size and a valid alignment; each
         // block is released with the same layout before the next allocation.
-        let pointer = unsafe { alloc(layout) };
+        let pointer = std::hint::black_box(unsafe { alloc(layout) });
         assert!(!pointer.is_null(), "the system allocator returned null");
         // SAFETY: `pointer` came from `alloc` with exactly `layout`.
         unsafe { dealloc(pointer, layout) };
