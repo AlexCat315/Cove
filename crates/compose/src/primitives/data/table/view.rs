@@ -80,14 +80,28 @@ const COLUMN_DRAG_SLOP: f32 = crate::primitives::interaction::DRAG_THRESHOLD;
 pub struct TableRowHover {
     row: std::cell::Cell<Option<usize>>,
     nodes: RefCell<HashMap<usize, Vec<(cove_core::scene::NodeWeak, Color, bool)>>>,
+    /// The row each node shell currently belongs to. Virtualized tables recycle
+    /// shells, so a node that used to draw row 40 can start drawing row 41;
+    /// without this, the stale row keeps painting it.
+    owners: RefCell<HashMap<cove_core::scene::ElementId, usize>>,
 }
 
 impl TableRowHover {
     fn register(&self, row: usize, node: &Node, fill: Color, is_selected: bool) {
         let mut nodes = self.nodes.borrow_mut();
-        let lane = nodes.entry(row).or_default();
-        lane.retain(|(weak, _, _)| Node::upgrade(weak).is_some_and(|known| known != *node));
-        lane.push((node.downgrade(), fill, is_selected));
+        let mut owners = self.owners.borrow_mut();
+        let id = node.id();
+        if let Some(previous) = owners.insert(id, row) {
+            if let Some(lane) = nodes.get_mut(&previous) {
+                lane.retain(|(weak, _, _)| {
+                    Node::upgrade(weak).is_some_and(|known| known.id() != id)
+                });
+            }
+        }
+        nodes
+            .entry(row)
+            .or_default()
+            .push((node.downgrade(), fill, is_selected));
     }
 
     fn paint(&self, row: usize, hovered: bool) {
@@ -3212,5 +3226,27 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
     }
     fn tag(&self) -> &'static str {
         std::any::type_name::<Self>()
+    }
+}
+
+#[cfg(test)]
+mod hover_tests {
+    use super::*;
+
+    #[test]
+    fn a_recycled_row_shell_only_belongs_to_its_current_row() {
+        let hover = TableRowHover::default();
+        let shell = Node::new();
+        hover.register(40, &shell, Color::CLEAR, false);
+        hover.register(41, &shell, Color::CLEAR, false);
+        let nodes = hover.nodes.borrow();
+        assert_eq!(
+            nodes.get(&40).map(Vec::len),
+            Some(0),
+            "the row the shell no longer draws must stop painting it"
+        );
+        assert_eq!(nodes.get(&41).map(Vec::len), Some(1));
+        drop(nodes);
+        assert_eq!(hover.owners.borrow().get(&shell.id()), Some(&41));
     }
 }
