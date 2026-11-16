@@ -441,6 +441,12 @@ impl Default for Sdl3PlatformHost {
     }
 }
 impl Sdl3PlatformHost {
+    /// Pointer position in global window units, or `None` before the shell
+    /// starts or when the platform cannot report it.
+    pub fn global_pointer_position(&self) -> Option<(f32, f32)> {
+        self.shell()?.borrow().global_pointer_position()
+    }
+
     pub fn new(title: impl Into<String>, options: WindowOptions) -> Self {
         Self::with_services(
             title,

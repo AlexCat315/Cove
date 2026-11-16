@@ -82,6 +82,7 @@ unsafe extern "C" {
         width: i32,
         height: i32,
         inset: bool,
+        borderless: bool,
         dock: bool,
         shaped: bool,
     ) -> *mut Window;

@@ -282,6 +282,16 @@ impl AppDisplayHandle {
     }
 
     /// Moves the main window's top-left corner to (x, y) in window units.
+    /// Pointer position in the same coordinate space as window positions.
+    pub fn global_pointer(&self) -> Option<(f32, f32)> {
+        self.bindings
+            .borrow()
+            .main_window
+            .global_pointer_query
+            .as_ref()
+            .and_then(|query| query())
+    }
+
     pub fn set_window_position(&self, x: f32, y: f32) {
         let action = self
             .bindings
@@ -316,6 +326,20 @@ impl AppDisplayHandle {
             .clone();
         if let Some(action) = action {
             action(width, height);
+        }
+    }
+
+    /// Keeps the main window above normal windows. Floating widgets use this
+    /// so their dot stays reachable while the user works in another app.
+    pub fn set_window_always_on_top(&self, on_top: bool) {
+        let action = self
+            .bindings
+            .borrow()
+            .main_window
+            .set_main_window_always_on_top_action
+            .clone();
+        if let Some(action) = action {
+            action(on_top);
         }
     }
 

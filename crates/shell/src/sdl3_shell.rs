@@ -468,6 +468,7 @@ impl Shell for Sdl3Shell {
                 options.width,
                 options.height,
                 options.title_bar_style == WindowTitleBarStyle::HiddenInset,
+                options.title_bar_style == WindowTitleBarStyle::Borderless,
                 options.shows_dock_icon,
                 options.shape.is_some(),
             )
@@ -494,9 +495,16 @@ impl Shell for Sdl3Shell {
         // The DX12 swapchain applies the DWM material with DirectComposition.
         #[cfg(target_os = "windows")]
         let applied = true;
-        // SAFETY: the window pointer is live and owned by `window`.
+        // A shaped window is its own silhouette: installing the window
+        // material would paint an opaque rectangle behind the circle that the
+        // shape mask cannot remove. The widget draws its own translucent disc.
         #[cfg(not(target_os = "windows"))]
-        let applied = unsafe { native::cove_shell_backdrop(pointer, 1) };
+        let applied = if options.shape.is_some() {
+            false
+        } else {
+            // SAFETY: the window pointer is live and owned by `window`.
+            unsafe { native::cove_shell_backdrop(pointer, 1) }
+        };
         if applied {
             window.translucent.set(true);
             // The backdrop moves content under the title bar; the first frame

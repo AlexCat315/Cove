@@ -16,6 +16,10 @@ pub enum WindowTitleBarStyle {
     #[default]
     Standard,
     HiddenInset,
+    /// No native title bar, no window buttons, no drag strip: a bare content
+    /// surface. Floating widgets use this so a 56pt dot is not overlapped by
+    /// the traffic lights.
+    Borderless,
 }
 /// Light or dark native chrome: title bar, window controls and materials.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]

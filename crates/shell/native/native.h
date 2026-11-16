@@ -24,7 +24,7 @@ void cove_shell_quit(void);
 const char *cove_shell_error(void);
 /* `shaped` requests SDL_WINDOW_TRANSPARENT so SDL_SetWindowShape can carve a
    click-through region; `dock=false` makes a utility window (skip taskbar). */
-CoveShellWindow *cove_shell_create(const char *title,int width,int height,bool inset,bool dock,bool shaped);
+CoveShellWindow *cove_shell_create(const char *title,int width,int height,bool inset,bool borderless,bool dock,bool shaped);
 void cove_shell_destroy(CoveShellWindow *window);
 /* kind 0 ellipse, 1 rounded rectangle with `radius` in window units. */
 bool cove_shell_set_window_shape(CoveShellWindow *window,int kind,float radius);

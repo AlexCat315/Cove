@@ -828,11 +828,23 @@ impl Application {
                 let host = host.clone();
                 move || host.main_window().and_then(|id| host.window_position(id))
             })),
+            global_pointer_query: Some(Rc::new({
+                let host = host.clone();
+                move || host.global_pointer_position()
+            })),
             set_main_window_size_action: Some(Rc::new({
                 let host = host.clone();
                 move |width: f32, height: f32| {
                     if let Some(id) = host.main_window() {
                         host.set_window_size(id, width, height);
+                    }
+                }
+            })),
+            set_main_window_always_on_top_action: Some(Rc::new({
+                let host = host.clone();
+                move |on_top: bool| {
+                    if let Some(id) = host.main_window() {
+                        host.set_window_always_on_top(id, on_top);
                     }
                 }
             })),

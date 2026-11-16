@@ -14,6 +14,9 @@ pub enum AppWindowTitleBarStyle {
     #[default]
     Standard,
     HiddenInset,
+    /// No title bar and no traffic lights. Intended for shaped floating
+    /// widgets whose whole window is a 56–300pt silhouette.
+    Borderless,
 }
 
 impl AppWindowTitleBarStyle {
@@ -22,6 +25,7 @@ impl AppWindowTitleBarStyle {
         match self {
             Self::Standard => cove_shell::WindowTitleBarStyle::Standard,
             Self::HiddenInset => cove_shell::WindowTitleBarStyle::HiddenInset,
+            Self::Borderless => cove_shell::WindowTitleBarStyle::Borderless,
         }
     }
 }

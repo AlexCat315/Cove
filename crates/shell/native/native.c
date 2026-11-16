@@ -44,7 +44,7 @@ bool cove_shell_init(void) {
 }
 void cove_shell_quit(void) { COVE_ASSERT_MAIN(); if (SDL_GetAtomicInt(&initialized)) { SDL_Quit(); SDL_SetAtomicInt(&initialized,0); SDL_SetAtomicInt(&wake_pending,0); SDL_SetAtomicInt(&wake_lost,0); } }
 const char *cove_shell_error(void) { return SDL_GetError(); }
-CoveShellWindow *cove_shell_create(const char *title,int width,int height,bool inset,bool dock,bool shaped) { COVE_ASSERT_MAIN();
+CoveShellWindow *cove_shell_create(const char *title,int width,int height,bool inset,bool borderless,bool dock,bool shaped) { COVE_ASSERT_MAIN();
     if (!cove_shell_init()) return NULL;
 #if defined(__APPLE__)
     cove_shell_apple_prepare(dock);
@@ -55,6 +55,11 @@ CoveShellWindow *cove_shell_create(const char *title,int width,int height,bool i
 #else
     if (inset) flags |= SDL_WINDOW_BORDERLESS;
 #endif
+    /* A borderless window has no title bar and no system window buttons, so a
+       shaped widget is a pure silhouette instead of a dot with traffic lights
+       layered on top of it. macOS needs this flag too: HiddenInset keeps the
+       buttons but lets content run underneath them. */
+    if (borderless) flags |= SDL_WINDOW_BORDERLESS;
     /* SDL_SetWindowShape requires the window to be created transparent. The
        flag makes fully transparent mask pixels click-through on every video
        backend that implements shape (Windows/X11/macOS). A resident widget
