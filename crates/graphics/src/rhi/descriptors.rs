@@ -762,6 +762,10 @@ pub struct SurfaceDescriptor {
     pub color_format: TextureFormat,
     /// The platform compositor blends premultiplied pixels over its backdrop.
     pub premultiplied_alpha: bool,
+    /// A shaped (click-through silhouette) window: clear pixels must be truly
+    /// transparent, so the Windows backend skips the DWM acrylic backdrop that
+    /// would otherwise fill the clipped-away corners with grey.
+    pub shaped: bool,
     pub vsync_enabled: bool,
 }
 impl SurfaceDescriptor {
@@ -774,6 +778,7 @@ impl SurfaceDescriptor {
             height: 0,
             color_format: super::platform_default_surface_format(),
             premultiplied_alpha: false,
+            shaped: false,
             vsync_enabled: true,
         }
     }

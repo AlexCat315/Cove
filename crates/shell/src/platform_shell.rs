@@ -33,6 +33,61 @@ pub enum SystemAppearance {
     Light,
     Dark,
 }
+/// Modifier keys for a global hotkey.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct HotKeyModifiers {
+    pub shift: bool,
+    pub control: bool,
+    pub alt: bool,
+    pub super_key: bool,
+}
+
+impl HotKeyModifiers {
+    pub fn bits(self) -> u32 {
+        (self.shift as u32)
+            | ((self.control as u32) << 1)
+            | ((self.alt as u32) << 2)
+            | ((self.super_key as u32) << 3)
+    }
+}
+
+/// A system-wide hotkey. `key` is an ASCII uppercase letter / digit, or an SDL
+/// scancode value for other keys. `id` is an app-chosen positive identifier
+/// delivered back when the combination fires.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct HotKey {
+    pub id: i32,
+    pub modifiers: HotKeyModifiers,
+    pub key: i32,
+}
+
+impl HotKey {
+    pub fn new(id: i32, modifiers: HotKeyModifiers, key: i32) -> Self {
+        Self { id, modifiers, key }
+    }
+}
+
+/// A click-through window silhouette. Fully transparent (outside) pixels do not
+/// receive mouse input on backends that implement window shaping (Windows, X11,
+/// macOS); Wayland has no portable shape and the request is ignored.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum WindowShape {
+    /// An ellipse inscribed in the window; a circle when the window is square.
+    Ellipse,
+    /// A rectangle with rounded corners of the given radius in window units.
+    RoundedRect { radius: f32 },
+}
+
+/// Geometry of one monitor in window units. `usable` excludes system chrome.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct DisplayBounds {
+    pub x: f32,
+    pub y: f32,
+    pub width: f32,
+    pub height: f32,
+    pub usable: bool,
+}
+
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct ChromeRect {
@@ -73,7 +128,7 @@ impl WindowChromeHitTest {
         }
     }
 }
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct WindowOptions {
     pub width: i32,
     pub height: i32,
@@ -82,6 +137,15 @@ pub struct WindowOptions {
     pub min_height: i32,
     pub title_bar_style: WindowTitleBarStyle,
     pub shows_dock_icon: bool,
+    /// Initial top-left position in window units. `None` lets the OS place it.
+    pub position: Option<(f32, f32)>,
+    /// Anchor the window to monitor `index` (SDL display order). When set with
+    /// `position`, the coordinates are relative to that monitor's origin; when
+    /// set alone, the window is centered on it.
+    pub display: Option<usize>,
+    /// Optional click-through silhouette. Setting this makes the window
+    /// transparent and requires the renderer to draw a matching alpha channel.
+    pub shape: Option<WindowShape>,
 }
 impl Default for WindowOptions {
     fn default() -> Self {
@@ -92,6 +156,9 @@ impl Default for WindowOptions {
             min_height: 0,
             title_bar_style: WindowTitleBarStyle::Standard,
             shows_dock_icon: true,
+            position: None,
+            display: None,
+            shape: None,
         }
     }
 }
@@ -295,6 +362,22 @@ pub trait Shell {
     }
     fn set_cursor(&self, id: WindowId, cursor: SystemCursor);
     fn global_pointer_position(&self) -> Option<(f32, f32)>;
+    /// Registers a system-wide hotkey. Fires are delivered to the app through
+    /// the platform event stream. Returns false where unsupported (Wayland).
+    fn register_hotkey(&self, _hotkey: HotKey) -> bool {
+        false
+    }
+    fn unregister_hotkey(&self, _id: i32) {}
+    /// Number of connected monitors. Zero when the platform cannot enumerate.
+    fn display_count(&self) -> usize {
+        0
+    }
+    /// Geometry of the monitor at `index` in SDL display order. `usable`
+    /// excludes system chrome (taskbar / menu bar) where the platform reports
+    /// it. The basis for placing a window on a specific screen.
+    fn display_bounds(&self, _index: usize, _usable: bool) -> Option<DisplayBounds> {
+        None
+    }
     fn window_position(&self, id: WindowId) -> Option<(f32, f32)>;
     fn set_window_position(&self, id: WindowId, x: f32, y: f32);
     fn set_window_size(&self, id: WindowId, width: f32, height: f32);
@@ -479,5 +562,45 @@ pub trait Shell {
         self.main_window_id()
             .and_then(|id| self.window(id))
             .is_some_and(|w| w.is_occluded())
+    }
+}
+
+#[cfg(test)]
+mod hotkey_tests {
+    use super::*;
+
+    #[test]
+    fn modifier_bits_are_stable() {
+        let all = HotKeyModifiers {
+            shift: true,
+            control: true,
+            alt: true,
+            super_key: true,
+        };
+        assert_eq!(all.bits(), 15);
+        assert_eq!(HotKeyModifiers::default().bits(), 0);
+        assert_eq!(
+            HotKeyModifiers {
+                control: true,
+                ..Default::default()
+            }
+            .bits(),
+            2
+        );
+    }
+
+    #[test]
+    fn hotkey_carries_id_and_key() {
+        let hotkey = HotKey::new(
+            7,
+            HotKeyModifiers {
+                control: true,
+                ..Default::default()
+            },
+            'K' as i32,
+        );
+        assert_eq!(hotkey.id, 7);
+        assert_eq!(hotkey.key, 'K' as i32);
+        assert_eq!(hotkey.modifiers.bits(), 2);
     }
 }

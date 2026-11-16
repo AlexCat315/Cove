@@ -5,9 +5,9 @@ use crate::{
 use cove_core::scene::*;
 use cove_platform::*;
 use cove_shell::{
-    ClipboardCompletion, EventLoopWaker, FileDialogFilter, MenuCompletion, NativeRenderSurface,
-    NativeWindowReference, Shell, ShellError, WindowChromeHitTest, WindowHandle, WindowOptions,
-    WindowSafeArea,
+    ClipboardCompletion, DisplayBounds, EventLoopWaker, FileDialogFilter, MenuCompletion,
+    NativeRenderSurface, NativeWindowReference, Shell, ShellError, WindowChromeHitTest,
+    WindowHandle, WindowOptions, WindowSafeArea,
 };
 use std::{
     cell::{Cell, RefCell},
@@ -650,6 +650,24 @@ impl Sdl3PlatformHost {
         self.shell().map_or(cove_shell::DeviceForm::Computer, |s| {
             s.borrow().device_form()
         })
+    }
+    /// Registers a system-wide hotkey with the native shell.
+    pub fn register_hotkey(&self, hotkey: cove_shell::HotKey) -> bool {
+        self.shell()
+            .is_some_and(|s| s.borrow().register_hotkey(hotkey))
+    }
+    pub fn unregister_hotkey(&self, id: i32) {
+        if let Some(s) = self.shell() {
+            s.borrow().unregister_hotkey(id);
+        }
+    }
+    /// Number of connected monitors.
+    pub fn display_count(&self) -> usize {
+        self.shell().map_or(0, |s| s.borrow().display_count())
+    }
+    /// Geometry of a monitor in platform display order.
+    pub fn display_bounds(&self, index: usize, usable: bool) -> Option<DisplayBounds> {
+        self.shell()?.borrow().display_bounds(index, usable)
     }
     pub fn window_position(&self, id: WindowId) -> Option<(f32, f32)> {
         self.shell()?.borrow().window_position(id)

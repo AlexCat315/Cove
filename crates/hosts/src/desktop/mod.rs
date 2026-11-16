@@ -17,7 +17,8 @@ pub mod resources_support;
 pub mod window;
 
 pub use application::configuration::{
-    AppFrameDrivePolicy, AppWindowRendering, AppWindowTitleBarStyle, ApplicationConfiguration,
+    AppFrameDrivePolicy, AppWindowPlacement, AppWindowRendering, AppWindowShape,
+    AppWindowTitleBarStyle, ApplicationConfiguration,
 };
 #[cfg(not(target_arch = "wasm32"))]
 pub use application::runtime::{Application, ApplicationCallbacks};

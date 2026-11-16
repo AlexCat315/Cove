@@ -420,6 +420,8 @@ pub enum InputEvent {
     /// A drag that started outside the application. Window identity travels in
     /// [`WindowInputEvent::window_id`], so it is not repeated here.
     ExternalDrop(ExternalDropEvent),
+    /// A system-wide hotkey fired; carries the app-chosen registration id.
+    GlobalHotkey(i32),
     GamepadButtonDown(GamepadButtonEvent),
     GamepadButtonUp(GamepadButtonEvent),
     GamepadAxisMotion(GamepadAxisEvent),

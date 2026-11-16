@@ -77,11 +77,48 @@ impl AppWindowRendering {
     }
 }
 
+/// Public alias for the click-through silhouette type used by window config.
+pub type AppWindowShape = cove_shell::WindowShape;
+/// Public alias for the initial placement descriptor.
+pub type AppWindowPlacement = WindowPlacement;
+
+/// Where the window first appears. Coordinates are in window units (logical
+/// points); with `display` set they are relative to that monitor's origin.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct WindowPlacement {
+    /// Top-left position. `None` centers on the target display, or lets the OS
+    /// choose when no display is given.
+    pub position: Option<(f32, f32)>,
+    /// Monitor index in platform display order. `None` uses the default.
+    pub display: Option<usize>,
+}
+
+impl WindowPlacement {
+    pub fn at(x: f32, y: f32) -> Self {
+        Self {
+            position: Some((x, y)),
+            display: None,
+        }
+    }
+
+    pub fn on_display(index: usize) -> Self {
+        Self {
+            position: None,
+            display: Some(index),
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct WindowConfiguration {
     pub title: String,
     pub width: i32,
     pub height: i32,
+    /// Initial monitor/placement. `None` keeps the platform default.
+    pub placement: Option<WindowPlacement>,
+    /// Optional click-through silhouette (circle / rounded-rectangle). Useful
+    /// for floating widgets; the renderer must draw a matching alpha channel.
+    pub shape: Option<cove_shell::WindowShape>,
     /// Smallest size the user may resize the window to, in logical points.
     /// Zero leaves that axis unbounded.
     pub min_width: i32,
@@ -111,6 +148,8 @@ impl Default for WindowConfiguration {
             title_bar_style: AppWindowTitleBarStyle::Standard,
             title_bar_divider: TitleBarDivider::Seamless,
             shows_dock_icon: true,
+            placement: None,
+            shape: None,
             rendering: AppWindowRendering::default(),
         }
     }
@@ -262,5 +301,47 @@ impl ApplicationConfiguration {
     /// The main window identifier the host opens first.
     pub fn main_window_id(&self) -> WindowId {
         WindowId::MAIN
+    }
+}
+
+#[cfg(test)]
+mod placement_tests {
+    use super::*;
+
+    #[test]
+    fn placement_at_sets_position_without_display() {
+        let p = WindowPlacement::at(100.0, 200.0);
+        assert_eq!(p.position, Some((100.0, 200.0)));
+        assert_eq!(p.display, None);
+    }
+
+    #[test]
+    fn placement_on_display_sets_display_without_position() {
+        let p = WindowPlacement::on_display(2);
+        assert_eq!(p.display, Some(2));
+        assert_eq!(p.position, None);
+    }
+
+    #[test]
+    fn default_configuration_has_no_placement() {
+        assert_eq!(WindowConfiguration::default().placement, None);
+    }
+}
+
+#[cfg(test)]
+mod shape_tests {
+    use super::*;
+
+    #[test]
+    fn window_shape_variants_are_distinct() {
+        assert_ne!(
+            AppWindowShape::Ellipse,
+            AppWindowShape::RoundedRect { radius: 8.0 }
+        );
+    }
+
+    #[test]
+    fn default_configuration_has_no_shape() {
+        assert_eq!(WindowConfiguration::default().shape, None);
     }
 }

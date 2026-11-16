@@ -22,8 +22,12 @@ void cove_shell_assert_main_thread(const char *function);
 bool cove_shell_init(void);
 void cove_shell_quit(void);
 const char *cove_shell_error(void);
-CoveShellWindow *cove_shell_create(const char *title,int width,int height,bool inset,bool dock);
+/* `shaped` requests SDL_WINDOW_TRANSPARENT so SDL_SetWindowShape can carve a
+   click-through region; `dock=false` makes a utility window (skip taskbar). */
+CoveShellWindow *cove_shell_create(const char *title,int width,int height,bool inset,bool dock,bool shaped);
 void cove_shell_destroy(CoveShellWindow *window);
+/* kind 0 ellipse, 1 rounded rectangle with `radius` in window units. */
+bool cove_shell_set_window_shape(CoveShellWindow *window,int kind,float radius);
 bool cove_shell_backdrop(CoveShellWindow *window,int kind);
 void cove_shell_appearance(CoveShellWindow *window,bool dark);
 bool cove_shell_state(CoveShellWindow *window,CoveShellWindowState *out);
@@ -51,6 +55,26 @@ int cove_shell_device_form(void);
 int cove_shell_system_theme(void);
 void cove_shell_cursor(CoveShellWindow *window,int cursor);
 bool cove_shell_global_pointer(float *x,float *y);
+/* Global hotkeys. Modifiers: 1 shift, 2 ctrl, 4 alt, 8 super. `key` is an
+   ASCII uppercase letter, a digit, or a function key (VK_F1..VK_F12 on
+   Windows). Returns false where the platform has no global hotkey facility
+   (e.g. Wayland). Fires arrive as CoveShellEvent kind 30 with `a` = id. */
+bool cove_shell_hotkey_register(int id,unsigned mods,int key);
+void cove_shell_hotkey_unregister(int id);
+void cove_shell_hotkey_fire(int id);
+/* Display geometry. `index` is the SDL display order; `usable` excludes system
+   chrome where the platform reports it. Returns false for an invalid index. */
+int cove_shell_display_count(void);
+bool cove_shell_display_bounds(int index,bool usable,CoveShellRect *out);
+/* Status-bar tray for non-Apple desktop hosts, backed by SDL's native tray
+   implementation (Windows and X11). Apple targets use cove_shell_status_item
+   below. `callback` receives the zero-based index of the chosen entry; empty
+   titles insert separators. Safe to call again to rebuild the menu. */
+#if !defined(__APPLE__) && !defined(__ANDROID__)
+typedef void (*CoveStatusItemCallback)(size_t index);
+bool cove_shell_tray_install(const char *icon_path,const char *tooltip,const char *const *titles,const char *const *ids,size_t count,CoveStatusItemCallback callback);
+void cove_shell_tray_destroy(void);
+#endif
 char *cove_shell_clipboard_read(void);
 bool cove_shell_clipboard_write(const char *text);
 void cove_shell_free(void *memory);

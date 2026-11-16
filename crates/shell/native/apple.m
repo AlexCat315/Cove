@@ -7,6 +7,7 @@
 #import <AppKit/AppKit.h>
 #import <CoreVideo/CoreVideo.h>
 #import <CoreServices/CoreServices.h>
+#import <Carbon/Carbon.h>
 #else
 #import <UIKit/UIKit.h>
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
@@ -177,6 +178,59 @@ void cove_shell_services_reveal(const char *path){
         [[NSWorkspace sharedWorkspace] selectFile:target inFileViewerRootedAtPath:@""];
     });
 }
+
+/* ===== Global hotkeys ===== */
+#if TARGET_OS_OSX
+#define COVE_MAC_HOTKEYS 32
+typedef struct { int id; EventHotKeyRef ref; } CoveMacHotkey;
+static CoveMacHotkey mac_hotkeys[COVE_MAC_HOTKEYS];
+static int mac_hotkey_count;
+static EventHandlerRef mac_hotkey_handler;
+static OSStatus cove_hotkey_handler(EventHandlerCallRef caller,EventRef event,void *data) {
+    (void)caller;(void)event;
+    EventHotKeyID hotkeyID;
+    GetEventParameter(event,kEventParamDirectObject,typeEventHotKeyID,NULL,sizeof(hotkeyID),NULL,&hotkeyID);
+    cove_shell_hotkey_fire((int)hotkeyID.id);
+    return noErr;
+}
+bool cove_shell_hotkey_register(int id,unsigned mods,int key) {
+    if (id <= 0 || mac_hotkey_count >= COVE_MAC_HOTKEYS) return false;
+    cove_shell_hotkey_unregister(id);
+    UInt32 carbonMods = 0;
+    if (mods & 1) carbonMods |= shiftKey;
+    if (mods & 2) carbonMods |= controlKey;
+    if (mods & 4) carbonMods |= optionKey;
+    if (mods & 8) carbonMods |= cmdKey;
+    UInt32 keyCode;
+    if (key >= 'A' && key <= 'Z') {
+        SDL_Keycode kc = SDL_GetKeyFromName([[[NSString stringWithFormat:@"%c",(char)(key+'a'-'A')] lowercaseString] UTF8String]);
+        keyCode = (UInt32)SDL_GetScancodeFromKey(kc, NULL);
+    } else if (key >= '0' && key <= '9') {
+        SDL_Keycode kc = SDL_GetKeyFromName([NSString stringWithFormat:@"%d",key-'0'] UTF8String);
+        keyCode = (UInt32)SDL_GetScancodeFromKey(kc, NULL);
+    } else {
+        keyCode = (UInt32)key;
+    }
+    EventHotKeyRef ref = NULL;
+    EventHotKeyID hotkeyID = { 'cvhk', (UInt32)id };
+    OSStatus status = RegisterEventHotKey(keyCode, carbonMods, hotkeyID, GetApplicationEventTarget(), 0, &ref);
+    if (status != noErr) return false;
+    static dispatch_once_t once;
+    dispatch_once(&once,^{
+        EventTypeSpec spec = { kEventClassKeyboard, kEventHotKeyPressed };
+        InstallEventHandler(GetApplicationEventTarget(), cove_hotkey_handler, 1, &spec, NULL, &mac_hotkey_handler);
+    });
+    mac_hotkeys[mac_hotkey_count++] = (CoveMacHotkey){ id, ref };
+    return true;
+}
+void cove_shell_hotkey_unregister(int id) {
+    for (int i = 0; i < mac_hotkey_count; i++) if (mac_hotkeys[i].id == id) {
+        UnregisterEventHotKey(mac_hotkeys[i].ref);
+        for (int j = i; j + 1 < mac_hotkey_count; j++) mac_hotkeys[j] = mac_hotkeys[j + 1];
+        mac_hotkey_count--; return;
+    }
+}
+#endif
 
 /* ===== Menu-bar extra ===== */
 static CoveStatusItemCallback statusItemCallback=NULL;

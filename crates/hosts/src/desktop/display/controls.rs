@@ -2,7 +2,7 @@
 
 use cove_platform::WindowId;
 use cove_runtime::PlatformFrameRateMode;
-use cove_shell::{FileDialogFilter, WindowChromeHitTest};
+use cove_shell::{DisplayBounds, FileDialogFilter, HotKey, WindowChromeHitTest};
 
 /// Runtime presentation overrides installed by the host on the display handle.
 #[derive(Clone, Default)]
@@ -12,6 +12,15 @@ pub struct PresentationControls {
     pub set_runtime_vsync_enabled: Option<std::rc::Rc<dyn Fn(bool)>>,
     pub set_title_bar_divider: Option<std::rc::Rc<dyn Fn(bool)>>,
     pub current_runtime_display_refresh_rate: Option<std::rc::Rc<dyn Fn() -> Option<f64>>>,
+    pub display_count_query: Option<std::rc::Rc<dyn Fn() -> usize>>,
+    pub display_bounds_query: Option<std::rc::Rc<dyn Fn(usize, bool) -> Option<DisplayBounds>>>,
+}
+
+/// Actions for registering app-wide global hotkeys.
+#[derive(Clone, Default)]
+pub struct HotKeyControls {
+    pub register_hotkey_action: Option<std::rc::Rc<dyn Fn(HotKey, std::rc::Rc<dyn Fn()>) -> bool>>,
+    pub unregister_hotkey_action: Option<std::rc::Rc<dyn Fn(i32)>>,
 }
 
 /// Actions the host wires to the main window.
@@ -27,6 +36,8 @@ pub struct MainWindowControls {
     pub set_main_window_chrome_hit_test_action:
         Option<std::rc::Rc<dyn Fn(Option<&WindowChromeHitTest>)>>,
     pub set_main_window_title_action: Option<std::rc::Rc<dyn Fn(&str)>>,
+    pub set_main_window_position_action: Option<std::rc::Rc<dyn Fn(f32, f32)>>,
+    pub main_window_position_query: Option<std::rc::Rc<dyn Fn() -> Option<(f32, f32)>>>,
 }
 
 /// Actions the host wires to any window by identifier.

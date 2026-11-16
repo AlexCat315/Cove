@@ -14,13 +14,15 @@ pub use application::{
 };
 pub use application_services::{http::TransportCapabilities, install_platform_services};
 
+pub use cove_shell::services as shell_services;
+pub use cove_shell::status_item;
+#[cfg(not(target_arch = "wasm32"))]
+pub use cove_shell::{HotKey, HotKeyModifiers, WindowShape};
 #[cfg(not(target_arch = "wasm32"))]
 pub use desktop::AppDisplayHandle;
 pub use desktop::application::configuration::{ApplicationConfiguration, TitleBarDivider};
 #[cfg(not(target_arch = "wasm32"))]
 pub use desktop::application::runtime::{Application, ApplicationCallbacks};
-pub use cove_shell::services as shell_services;
-pub use cove_shell::status_item as status_item;
 pub use desktop::window::{
     NativeMenu, NativeMenuAction, NativeMenuBar, NativeMenuItem, NativeMenuKeyModifiers,
 };

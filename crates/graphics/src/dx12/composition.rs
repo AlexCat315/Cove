@@ -72,23 +72,29 @@ pub fn create(
             target.SetRoot(&visual)?;
             compositor.Commit()?;
 
-            // The extended frame exposes DWM behind the premultiplied visual.
-            let margins = MARGINS {
-                cxLeftWidth: -1,
-                cxRightWidth: -1,
-                cyTopHeight: -1,
-                cyBottomHeight: -1,
-            };
-            DwmExtendFrameIntoClientArea(hwnd, &margins)?;
-            // Desktop Acrylic is available on newer Windows 11 builds. Older
-            // versions still composite the transparent pixels over the frame.
-            let acrylic = DWMSBT_TRANSIENTWINDOW;
-            let _ = DwmSetWindowAttribute(
-                hwnd,
-                DWMWA_SYSTEMBACKDROP_TYPE,
-                (&acrylic as *const DWM_SYSTEMBACKDROP_TYPE).cast(),
-                core::mem::size_of_val(&acrylic) as u32,
-            );
+            if !surface.shaped {
+                // The extended frame exposes DWM behind the premultiplied visual.
+                let margins = MARGINS {
+                    cxLeftWidth: -1,
+                    cxRightWidth: -1,
+                    cyTopHeight: -1,
+                    cyBottomHeight: -1,
+                };
+                DwmExtendFrameIntoClientArea(hwnd, &margins)?;
+                // Desktop Acrylic is available on newer Windows 11 builds. Older
+                // versions still composite the transparent pixels over the frame.
+                let acrylic = DWMSBT_TRANSIENTWINDOW;
+                let _ = DwmSetWindowAttribute(
+                    hwnd,
+                    DWMWA_SYSTEMBACKDROP_TYPE,
+                    (&acrylic as *const DWM_SYSTEMBACKDROP_TYPE).cast(),
+                    core::mem::size_of_val(&acrylic) as u32,
+                );
+            }
+            // A shaped window keeps its clear pixels fully transparent: the
+            // elliptical SetWindowRgn clips the silhouette and DirectComposition
+            // presents straight over the desktop, with no DWM material filling
+            // the clipped-away corners.
             Ok((
                 chain.into_raw(),
                 CompositionTarget {

@@ -469,6 +469,7 @@ impl Shell for Sdl3Shell {
                 options.height,
                 options.title_bar_style == WindowTitleBarStyle::HiddenInset,
                 options.shows_dock_icon,
+                options.shape.is_some(),
             )
         };
         if pointer.is_null() {
@@ -506,6 +507,16 @@ impl Shell for Sdl3Shell {
                 window.state.set(state);
             }
         }
+        if let Some(shape) = options.shape {
+            let (kind, radius) = match shape {
+                WindowShape::Ellipse => (0i32, 0.0f32),
+                WindowShape::RoundedRect { radius } => (1i32, radius),
+            };
+            // SAFETY: the window pointer is live and owned by `window`. A false
+            // return means the backend (e.g. Wayland) has no shape support; the
+            // window still works as a plain transparent rectangle.
+            let _ = unsafe { native::cove_shell_set_window_shape(pointer, kind, radius) };
+        }
         self.windows.insert(id, window.clone());
         if options.min_width > 0 || options.min_height > 0 {
             self.set_window_min_size(
@@ -513,6 +524,23 @@ impl Shell for Sdl3Shell {
                 options.min_width.max(1) as f32,
                 options.min_height.max(1) as f32,
             );
+        }
+        // Resolve the monitor anchor before applying the initial position.
+        let display_origin = options.display.and_then(|index| {
+            self.display_bounds(index, true)
+                .map(|bounds| (bounds, bounds.x, bounds.y))
+        });
+        let position = match (options.position, display_origin) {
+            (Some((x, y)), Some((_bounds, ox, oy))) => Some((ox + x, oy + y)),
+            (Some(position), None) => Some(position),
+            (None, Some((bounds, ox, oy))) => Some((
+                ox + (bounds.width - options.width as f32) / 2.0,
+                oy + (bounds.height - options.height as f32) / 2.0,
+            )),
+            (None, None) => None,
+        };
+        if let Some((x, y)) = position {
+            self.set_window_position(id, x, y);
         }
         self.order.retain(|entry| *entry != id);
         self.order.push(id);
@@ -662,6 +690,37 @@ impl Shell for Sdl3Shell {
     fn global_pointer_position(&self) -> Option<(f32, f32)> {
         let (mut x, mut y) = (0.0, 0.0); // SAFETY: outputs are exclusively writable stack values.
         unsafe { native::cove_shell_global_pointer(&mut x, &mut y) }.then_some((x, y))
+    }
+    fn register_hotkey(&self, hotkey: HotKey) -> bool {
+        if hotkey.id <= 0 {
+            return false;
+        }
+        // SAFETY: plain integer arguments; the bridge validates the id.
+        unsafe {
+            native::cove_shell_hotkey_register(hotkey.id, hotkey.modifiers.bits(), hotkey.key)
+        }
+    }
+    fn unregister_hotkey(&self, id: i32) {
+        // SAFETY: plain integer argument; the bridge ignores unknown ids.
+        unsafe { native::cove_shell_hotkey_unregister(id) };
+    }
+    fn display_count(&self) -> usize {
+        // SAFETY: no arguments; the bridge returns 0 until SDL is initialized.
+        unsafe { native::cove_shell_display_count() }.max(0) as usize
+    }
+    fn display_bounds(&self, index: usize, usable: bool) -> Option<DisplayBounds> {
+        let mut rect = native::Rect::default(); // SAFETY: exclusively writable stack value.
+        // SAFETY: `rect` is valid for the call; the bridge writes it before returning true.
+        if !unsafe { native::cove_shell_display_bounds(index as i32, usable, &mut rect) } {
+            return None;
+        }
+        Some(DisplayBounds {
+            x: rect.x,
+            y: rect.y,
+            width: rect.width,
+            height: rect.height,
+            usable,
+        })
     }
     fn window_position(&self, id: WindowId) -> Option<(f32, f32)> {
         self.windows.get(&id).map(|w| {
@@ -1105,6 +1164,7 @@ fn decode_event(e: &native::Event) -> Option<InputEvent> {
         25..=29 => {
             InputEvent::ExternalDrop(external_drop(e.kind, e.x, e.y, e.string(), e.aux_string()))
         }
+        30 => InputEvent::GlobalHotkey(e.a),
         _ => return None,
     })
 }

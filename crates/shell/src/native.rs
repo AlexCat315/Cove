@@ -48,6 +48,14 @@ pub(crate) struct WindowState {
     pub refresh_rate: f64,
 }
 #[repr(C)]
+#[derive(Clone, Copy, Default, Debug)]
+pub(crate) struct Rect {
+    pub x: f32,
+    pub y: f32,
+    pub width: f32,
+    pub height: f32,
+}
+#[repr(C)]
 pub(crate) struct Chrome {
     pub title_height: f32,
     pub leading: f32,
@@ -75,8 +83,10 @@ unsafe extern "C" {
         height: i32,
         inset: bool,
         dock: bool,
+        shaped: bool,
     ) -> *mut Window;
     pub fn cove_shell_destroy(window: *mut Window);
+    pub fn cove_shell_set_window_shape(window: *mut Window, kind: i32, radius: f32) -> bool;
     /// Shows the platform material behind the window's clear pixels; false
     /// where the platform has none.
     #[cfg(not(target_os = "windows"))]
@@ -99,6 +109,10 @@ unsafe extern "C" {
     pub fn cove_shell_system_theme() -> i32;
     pub fn cove_shell_cursor(window: *mut Window, cursor: i32);
     pub fn cove_shell_global_pointer(x: *mut f32, y: *mut f32) -> bool;
+    pub fn cove_shell_display_count() -> i32;
+    pub fn cove_shell_display_bounds(index: i32, usable: bool, out: *mut Rect) -> bool;
+    pub fn cove_shell_hotkey_register(id: i32, mods: u32, key: i32) -> bool;
+    pub fn cove_shell_hotkey_unregister(id: i32);
     pub fn cove_shell_clipboard_read() -> *mut c_char;
     pub fn cove_shell_clipboard_write(text: *const c_char) -> bool;
     pub fn cove_shell_free(pointer: *mut c_void);

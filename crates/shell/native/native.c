@@ -16,6 +16,7 @@ static SDL_AtomicInt wake_pending;
 static SDL_AtomicInt wake_lost;
 static SDL_AtomicInt initialized;
 static uint32_t wake_type;
+static uint32_t hotkey_type;
 bool cove_shell_is_main_thread(void) { return SDL_IsMainThread(); }
 #if defined(COVE_ASSERT_MAIN_THREAD)
 void cove_shell_assert_main_thread(const char *function) {
@@ -38,11 +39,12 @@ bool cove_shell_init(void) {
     SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS,"0");
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) return false;
     wake_type = SDL_RegisterEvents(1); if (wake_type == (uint32_t)-1) { SDL_Quit(); return false; }
+    hotkey_type = SDL_RegisterEvents(1); if (hotkey_type == (uint32_t)-1) { SDL_Quit(); return false; }
     SDL_SetAtomicInt(&initialized,1); return true;
 }
 void cove_shell_quit(void) { COVE_ASSERT_MAIN(); if (SDL_GetAtomicInt(&initialized)) { SDL_Quit(); SDL_SetAtomicInt(&initialized,0); SDL_SetAtomicInt(&wake_pending,0); SDL_SetAtomicInt(&wake_lost,0); } }
 const char *cove_shell_error(void) { return SDL_GetError(); }
-CoveShellWindow *cove_shell_create(const char *title,int width,int height,bool inset,bool dock) { COVE_ASSERT_MAIN();
+CoveShellWindow *cove_shell_create(const char *title,int width,int height,bool inset,bool dock,bool shaped) { COVE_ASSERT_MAIN();
     if (!cove_shell_init()) return NULL;
 #if defined(__APPLE__)
     cove_shell_apple_prepare(dock);
@@ -53,6 +55,13 @@ CoveShellWindow *cove_shell_create(const char *title,int width,int height,bool i
 #else
     if (inset) flags |= SDL_WINDOW_BORDERLESS;
 #endif
+    /* SDL_SetWindowShape requires the window to be created transparent. The
+       flag makes fully transparent mask pixels click-through on every video
+       backend that implements shape (Windows/X11/macOS). A resident widget
+       (dock=false) is a utility window, which SDL maps to a skip-taskbar type
+       on X11 and to WS_EX_TOOLWINDOW on Windows. */
+    if (shaped) flags |= SDL_WINDOW_TRANSPARENT;
+    if (!dock) flags |= SDL_WINDOW_UTILITY;
 #if defined(_WIN32)
     float scale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay()); if (!isfinite(scale) || scale < 1) scale = 1;
     width = (int)roundf(width * scale); height = (int)roundf(height * scale);
@@ -71,6 +80,173 @@ CoveShellWindow *cove_shell_create(const char *title,int width,int height,bool i
 #endif
     return handle;
 }
+/* Builds an alpha mask for a shaped (transparent) window. `kind` 0 = ellipse,
+   1 = rounded rectangle; `radius` is in window units for the rounded form.
+   Fully transparent pixels become click-through via SDL's per-backend shape
+   implementation. Returns false where the backend has no shape support
+   (notably Wayland). The mask is copied by SDL and freed here. */
+bool cove_shell_set_window_shape(CoveShellWindow *h,int kind,float radius) { COVE_ASSERT_MAIN();
+    if (!h || !h->window) return false;
+    int width,height; SDL_GetWindowSize(h->window,&width,&height);
+    if (width <= 0 || height <= 0) return false;
+    SDL_Surface *mask = SDL_CreateSurface(width,height,SDL_PIXELFORMAT_ARGB32);
+    if (!mask) return false;
+    if (SDL_LockSurface(mask)) {
+        Uint32 *pixels = (Uint32 *)mask->pixels;
+        int pitch = mask->pitch / (int)sizeof(Uint32);
+        float rx = kind == 0 ? width / 2.0f : radius;
+        float ry = kind == 0 ? height / 2.0f : radius;
+        if (rx < 0) rx = 0; if (ry < 0) ry = 0;
+        float cx = (width - 1) / 2.0f, cy = (height - 1) / 2.0f;
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                bool inside;
+                if (kind == 0) {
+                    float dx = (x - cx) / (rx > 0 ? rx : 1.0f);
+                    float dy = (y - cy) / (ry > 0 ? ry : 1.0f);
+                    inside = dx * dx + dy * dy <= 1.0f;
+                } else {
+                    float qx = fabsf(x - cx) - (cx - rx);
+                    float qy = fabsf(y - cy) - (cy - ry);
+                    float ox = fmaxf(qx, 0.0f), oy = fmaxf(qy, 0.0f);
+                    inside = fminf(fmaxf(qx, qy), 0.0f) + sqrtf(ox * ox + oy * oy) <= fmaxf(radius, 0.0f);
+                }
+                pixels[y * pitch + x] = inside ? 0xFFFFFFFFu : 0x00000000u;
+            }
+        }
+        SDL_UnlockSurface(mask);
+    }
+    bool ok = SDL_SetWindowShape(h->window, mask);
+    SDL_DestroySurface(mask);
+    return ok;
+}
+
+/* ---- Global hotkeys -----------------------------------------------------
+   Modifiers: 1 shift, 2 ctrl, 4 alt, 8 super. `key` is a platform-neutral
+   virtual key: ASCII letters ('A'-'Z'), digits ('0'-'9'), or an SDL scancode
+   for the rest. A registration pushes a user event carrying the id in
+   `user.code` when fired, which the poll loop decodes to kind 30. */
+static void emit_hotkey(int id) {
+    SDL_Event event; SDL_zero(event); event.type = hotkey_type; event.user.code = id;
+    SDL_PushEvent(&event);
+}
+
+#if defined(_WIN32)
+/* Polling-based detection avoids depending on SDL dispatching WM_HOTKEY to a
+   message-only window. Each frame we check the registered combos with
+   GetAsyncKeyState; edge detection suppresses repeats. */
+#define COVE_MAX_HOTKEYS 32
+typedef struct { int id; unsigned mods; int vk; bool was_down; } CoveHotkey;
+static CoveHotkey hotkeys[COVE_MAX_HOTKEYS];
+static int hotkey_count;
+bool cove_shell_hotkey_register(int id,unsigned mods,int key) { COVE_ASSERT_MAIN();
+    if (!SDL_GetAtomicInt(&initialized) || id <= 0 || hotkey_count >= COVE_MAX_HOTKEYS) return false;
+    int vk;
+    if (key >= 'A' && key <= 'Z') vk = key;
+    else if (key >= '0' && key <= '9') vk = key;
+    else if (key >= VK_F1 && key <= VK_F12) vk = key; /* caller passes a Win32 VK */
+    else vk = 0;
+    if (!vk) return false;
+    for (int i = 0; i < hotkey_count; i++) if (hotkeys[i].id == id) { hotkeys[i].mods=mods; hotkeys[i].vk=vk; hotkeys[i].was_down=false; return true; }
+    hotkeys[hotkey_count++] = (CoveHotkey){ id, mods, vk, false };
+    return true;
+}
+void cove_shell_hotkey_unregister(int id) { COVE_ASSERT_MAIN();
+    for (int i = 0; i < hotkey_count; i++) if (hotkeys[i].id == id) {
+        for (int j = i; j + 1 < hotkey_count; j++) hotkeys[j] = hotkeys[j + 1];
+        hotkey_count--; return;
+    }
+}
+void cove_shell_hotkey_poll(void) { COVE_ASSERT_MAIN();
+    for (int i = 0; i < hotkey_count; i++) {
+        CoveHotkey *h = &hotkeys[i];
+        bool shift = (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;
+        bool ctrl = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
+        bool alt = (GetAsyncKeyState(VK_MENU) & 0x8000) != 0;
+        bool win = (GetAsyncKeyState(VK_LWIN) & 0x8000) || (GetAsyncKeyState(VK_RWIN) & 0x8000);
+        bool mods_ok = ((h->mods & 1) ? shift : !shift) && ((h->mods & 2) ? ctrl : !ctrl)
+                    && ((h->mods & 4) ? alt : !alt) && ((h->mods & 8) ? win : !win);
+        bool down = mods_ok && (GetAsyncKeyState(h->vk) & 0x8000) != 0;
+        if (down && !h->was_down) emit_hotkey(h->id);
+        h->was_down = down;
+    }
+}
+#elif defined(__APPLE__)
+/* Implemented in apple.m via Carbon RegisterEventHotKey; declared in native.h
+   under __APPLE__ and emitted through cove_shell_hotkey_emit. */
+bool cove_shell_hotkey_emit(int id) { (void)id; return false; }
+#elif defined(__linux__)
+/* X11 hotkeys via dlopen'd libX11, no link-time dependency. We poll the key
+   map each frame (like the Windows path) using a private Display connection,
+   which avoids competing with SDL's event loop for XGrabKey events. Returns
+   false on Wayland / when X11 is unavailable. */
+#include <dlfcn.h>
+typedef struct _XDisplay XDisplay;
+typedef unsigned long XID;
+static void *x11_lib;
+static XDisplay *x11_display;
+static int (*x_open_display)(const char *);
+static int (*x_close_display)(XDisplay *);
+static unsigned long (*x_keysym_to_keycode)(XDisplay *, unsigned long);
+static int (*x_query_keymap)(XDisplay *, char *);
+#define COVE_MAX_HOTKEYS 32
+typedef struct { int id; unsigned mods; int keycode; bool was_down; } CoveHotkey;
+static CoveHotkey hotkeys[COVE_MAX_HOTKEYS];
+static int hotkey_count;
+static unsigned long hotkey_keysym(int key) {
+    if (key >= 'A' && key <= 'Z') return key + 0x60; /* XK_a */
+    if (key >= 'a' && key <= 'z') return key;
+    if (key >= '0' && key <= '9') return (unsigned long)key;
+    if (key >= 0x70 && key <= 0x7B) return 0xFFBE + (key - 0x70); /* VK_F1..F12 -> XK_F1 */
+    return 0;
+}
+static bool x11_hotkey_init(void) {
+    if (x11_lib) return x11_display != NULL;
+    x11_lib = dlopen("libX11.so.6", RTLD_LAZY);
+    if (!x11_lib) return false;
+    x_open_display = (int (*)(const char *))dlsym(x11_lib, "XOpenDisplay");
+    x_close_display = (int (*)(XDisplay *))dlsym(x11_lib, "XCloseDisplay");
+    x_keysym_to_keycode = (unsigned long (*)(XDisplay *, unsigned long))dlsym(x11_lib, "XKeysymToKeycode");
+    x_query_keymap = (int (*)(XDisplay *, char *))dlsym(x11_lib, "XQueryKeymap");
+    if (!x_open_display || !x_query_keymap || !x_keysym_to_keycode) return false;
+    x11_display = (XDisplay *)x_open_display(NULL);
+    return x11_display != NULL;
+}
+bool cove_shell_hotkey_register(int id,unsigned mods,int key) { COVE_ASSERT_MAIN();
+    if (id <= 0 || hotkey_count >= COVE_MAX_HOTKEYS || !x11_hotkey_init()) return false;
+    unsigned long sym = hotkey_keysym(key);
+    if (!sym) return false;
+    int keycode = (int)x_keysym_to_keycode(x11_display, sym);
+    if (!keycode) return false;
+    for (int i = 0; i < hotkey_count; i++) if (hotkeys[i].id == id) { hotkeys[i].mods=mods; hotkeys[i].keycode=keycode; hotkeys[i].was_down=false; return true; }
+    hotkeys[hotkey_count++] = (CoveHotkey){ id, mods, keycode, false };
+    return true;
+}
+void cove_shell_hotkey_unregister(int id) { COVE_ASSERT_MAIN();
+    for (int i = 0; i < hotkey_count; i++) if (hotkeys[i].id == id) {
+        for (int j = i; j + 1 < hotkey_count; j++) hotkeys[j] = hotkeys[j + 1];
+        hotkey_count--; return;
+    }
+}
+void cove_shell_hotkey_poll(void) { COVE_ASSERT_MAIN();
+    if (!x11_display || hotkey_count == 0) return;
+    char keymap[32]; if (!x_query_keymap(x11_display, keymap)) return;
+    for (int i = 0; i < hotkey_count; i++) {
+        CoveHotkey *h = &hotkeys[i];
+        bool down = (keymap[h->keycode / 8] & (1 << (h->keycode % 8))) != 0;
+        if (down && !h->was_down) emit_hotkey(h->id);
+        h->was_down = down;
+    }
+}
+#else
+bool cove_shell_hotkey_register(int id,unsigned mods,int key) { (void)id;(void)mods;(void)key;return false; }
+void cove_shell_hotkey_unregister(int id) { (void)id; }
+#endif
+
+/* Called by platform callbacks (including apple.m and the X11 monitor) to
+   deliver a hotkey into the SDL event stream from any thread. */
+void cove_shell_hotkey_fire(int id) { emit_hotkey(id); }
+
 /* kind 0 is opaque, 1 the sidebar material. Windows and Linux report false:
    their DXGI and Vulkan swapchains here are created opaque, so a system
    backdrop (Mica, compositor blur) could not show through. */
@@ -140,10 +316,14 @@ static float coordinate_scale(uint32_t id) {
 }
 bool cove_shell_poll(CoveShellEvent *out) { COVE_ASSERT_MAIN();
     SDL_Event e;
+#if defined(_WIN32) || defined(__linux__)
+    cove_shell_hotkey_poll();
+#endif
     while(SDL_GetAtomicInt(&initialized) && SDL_PollEvent(&e)) {
         memset(out,0,sizeof(*out)); out->window=e.window.windowID;out->timestamp=(double)e.common.timestamp/1e9;
+        if(e.type==hotkey_type) { out->kind=30; out->a=e.user.code; return true; }
 #if defined(__APPLE__)
-        if(e.type >= SDL_EVENT_USER && e.type != wake_type) { out->identity=(uintptr_t)e.user.data1;out->kind=e.type; if(cove_shell_apple_event(out)) return true; }
+        if(e.type >= SDL_EVENT_USER && e.type != wake_type && e.type != hotkey_type) { out->identity=(uintptr_t)e.user.data1;out->kind=e.type; if(cove_shell_apple_event(out)) return true; }
 #endif
         if(e.type==wake_type) { SDL_SetAtomicInt(&wake_pending,0);continue; }
         switch(e.type) {
@@ -265,6 +445,77 @@ int cove_shell_device_form(void){
 }
 void cove_shell_cursor(CoveShellWindow *h,int cursor){ COVE_ASSERT_MAIN();static const SDL_SystemCursor ids[]={SDL_SYSTEM_CURSOR_DEFAULT,SDL_SYSTEM_CURSOR_POINTER,SDL_SYSTEM_CURSOR_TEXT,SDL_SYSTEM_CURSOR_CROSSHAIR,SDL_SYSTEM_CURSOR_WAIT,SDL_SYSTEM_CURSOR_PROGRESS,SDL_SYSTEM_CURSOR_NOT_ALLOWED,SDL_SYSTEM_CURSOR_MOVE,SDL_SYSTEM_CURSOR_EW_RESIZE,SDL_SYSTEM_CURSOR_NS_RESIZE,SDL_SYSTEM_CURSOR_NWSE_RESIZE,SDL_SYSTEM_CURSOR_NESW_RESIZE};if(!h||cursor<0||cursor>=12)return;if(!h->cursors[cursor])h->cursors[cursor]=SDL_CreateSystemCursor(ids[cursor]);if(h->cursors[cursor])SDL_SetCursor(h->cursors[cursor]);}
 bool cove_shell_global_pointer(float *x,float *y){ COVE_ASSERT_MAIN();if(!SDL_GetAtomicInt(&initialized))return false;SDL_GetGlobalMouseState(x,y);return true;}
+
+/* Display geometry for placing windows (e.g. a floating widget) on a specific
+   monitor. SDL owns enumeration on every platform. `bounds` is in SDL window
+   units and `usable` excludes the taskbar/menu bar where SDL reports it. */
+int cove_shell_display_count(void) { COVE_ASSERT_MAIN();
+    if (!SDL_GetAtomicInt(&initialized)) return 0;
+    int count = 0; SDL_DisplayID *ids = SDL_GetDisplays(&count);
+    if (!ids) return 0;
+    SDL_free(ids); return count;
+}
+bool cove_shell_display_bounds(int index,bool usable,CoveShellRect *out) { COVE_ASSERT_MAIN();
+    if (!out || !SDL_GetAtomicInt(&initialized)) return false;
+    int count = 0; SDL_DisplayID *ids = SDL_GetDisplays(&count);
+    if (!ids || index < 0 || index >= count) { SDL_free(ids); return false; }
+    SDL_DisplayID id = ids[index]; SDL_free(ids);
+    SDL_Rect rect;
+    bool ok = usable ? SDL_GetDisplayUsableBounds(id, &rect) : SDL_GetDisplayBounds(id, &rect);
+    if (!ok) return false;
+    out->x=(float)rect.x;out->y=(float)rect.y;out->width=(float)rect.w;out->height=(float)rect.h;
+    return true;
+}
+
+/* Status-bar tray for platforms without AppKit's NSStatusItem (native.c is not
+   compiled on Apple targets). SDL owns the native implementation on Windows and
+   X11, so one bridge covers both. The Rust side keeps the menu model and drains
+   picks on the UI thread; each entry carries its index as userdata. */
+#if !defined(__APPLE__) && !defined(__ANDROID__) && !defined(__IOS__)
+static SDL_Tray *tray = NULL;
+typedef void (*CoveStatusItemCallback)(size_t index);
+static CoveStatusItemCallback tray_callback = NULL;
+static void SDLCALL tray_picked(void *raw, SDL_TrayEntry *entry) {
+    (void)entry;
+    if (!tray_callback) return;
+    size_t index = (size_t)(uintptr_t)raw;
+    tray_callback(index);
+    cove_shell_wake();
+}
+void cove_shell_tray_destroy(void) {
+    if (tray) { SDL_DestroyTray(tray); tray = NULL; }
+    tray_callback = NULL;
+}
+bool cove_shell_tray_install(const char *icon_path,const char *tooltip,
+                             const char *const *titles,const char *const *ids,
+                             size_t count,CoveStatusItemCallback callback) {
+    COVE_ASSERT_MAIN();
+    if (!SDL_GetAtomicInt(&initialized) || !callback) return false;
+    if (tray) SDL_DestroyTray(tray);
+    tray_callback = callback;
+    SDL_Surface *icon = NULL;
+    if (icon_path && *icon_path) icon = SDL_LoadBMP(icon_path);
+    tray = SDL_CreateTray(icon, tooltip && *tooltip ? tooltip : "Cove");
+    if (icon) SDL_DestroySurface(icon);
+    if (!tray) { tray_callback = NULL; return false; }
+    SDL_TrayMenu *menu = SDL_GetTrayMenu(tray);
+    if (!menu) { SDL_DestroyTray(tray); tray = NULL; tray_callback = NULL; return false; }
+    for (size_t i = 0; i < count; i++) {
+        const char *label = titles[i];
+        if (!label || !*label) {
+            SDL_InsertTrayEntryAt(menu, -1, NULL, SDL_TRAYENTRY_BUTTON);
+            continue;
+        }
+        SDL_TrayEntryFlags flags = SDL_TRAYENTRY_BUTTON;
+        (void)ids; /* entry ids are resolved to indices on the Rust side */
+        SDL_TrayEntry *entry = SDL_InsertTrayEntryAt(menu, -1, label, flags);
+        if (entry) SDL_SetTrayEntryCallback(entry, tray_picked, (void *)(uintptr_t)i);
+    }
+    SDL_UpdateTrays();
+    return true;
+}
+#endif
+
 char *cove_shell_clipboard_read(void){ COVE_ASSERT_MAIN();return SDL_GetClipboardText();}bool cove_shell_clipboard_write(const char *text){ COVE_ASSERT_MAIN();return SDL_SetClipboardText(text);}void cove_shell_free(void *p){SDL_free(p);}
 struct DialogBox{CoveShellDialogCallback callback;void *context;SDL_DialogFileFilter *filters;char *path;size_t count;};
 static void dialog_box_free(struct DialogBox *box){for(size_t i=0;i<box->count;i++){SDL_free((void*)box->filters[i].name);SDL_free((void*)box->filters[i].pattern);}SDL_free(box->filters);SDL_free(box->path);SDL_free(box);}

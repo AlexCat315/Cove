@@ -27,6 +27,9 @@ pub struct AppWindowRenderSettings {
     /// linear premultiplied colour the frame holds.
     pub surface_format: TextureFormat,
     pub premultiplied_alpha: bool,
+    /// The window has a click-through silhouette; clear pixels must stay fully
+    /// transparent instead of showing a platform material behind them.
+    pub shaped: bool,
 }
 
 pub struct CapturedFrame {
@@ -210,6 +213,7 @@ impl NativeAppWindowRenderer {
         let mut descriptor = SurfaceFactory::native_descriptor(native, [size.0, size.1], vsync);
         descriptor.color_format = self.settings.surface_format;
         descriptor.premultiplied_alpha = self.settings.premultiplied_alpha;
+        descriptor.shaped = self.settings.shaped;
         descriptor
     }
 
@@ -493,6 +497,7 @@ mod tests {
                 clear_color: [0.0, 0.0, 0.0, 1.0],
                 surface_format: TextureFormat::Bgra8UnormSrgb,
                 premultiplied_alpha: false,
+                shaped: false,
             },
             true,
         );

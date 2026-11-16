@@ -7,10 +7,10 @@
 //! the Swift `nil` optional (request goes nowhere / returns the documented
 //! default).
 
-use super::controls::{MainWindowControls, PresentationControls, WindowControls};
+use super::controls::{HotKeyControls, MainWindowControls, PresentationControls, WindowControls};
 use cove_platform::WindowId;
 use cove_runtime::PlatformFrameRateMode;
-use cove_shell::{FileDialogFilter, WindowChromeHitTest};
+use cove_shell::{DisplayBounds, FileDialogFilter, HotKey, WindowChromeHitTest};
 use std::cell::{Cell, RefCell};
 use std::collections::BTreeMap;
 use std::rc::Rc;
@@ -62,6 +62,7 @@ pub struct DisplayBindings {
     pub presentation: PresentationControls,
     pub main_window: MainWindowControls,
     pub windows: WindowControls,
+    pub hotkeys: HotKeyControls,
     pub open_auxiliary_window: Option<Rc<dyn Fn(AppAuxiliaryWindowRequest) -> Option<WindowId>>>,
     pub close_auxiliary_window: Option<Rc<dyn Fn(WindowId)>>,
     pub auxiliary_window_is_open: Option<Rc<dyn Fn(WindowId) -> bool>>,
@@ -138,6 +139,55 @@ impl AppDisplayHandle {
     pub fn trim_memory(&self) {
         if let Some(trim) = self.bindings.borrow().trim_memory.clone() {
             trim();
+        }
+    }
+
+    // MARK: - Displays
+
+    /// Number of connected monitors, or zero when the platform cannot report it.
+    pub fn display_count(&self) -> usize {
+        self.bindings
+            .borrow()
+            .presentation
+            .display_count_query
+            .as_ref()
+            .map_or(0, |query| query())
+    }
+
+    /// Geometry of the monitor at `index`. `usable` excludes system chrome such
+    /// as the taskbar or menu bar where the platform reports it.
+    pub fn display_bounds(&self, index: usize, usable: bool) -> Option<DisplayBounds> {
+        self.bindings
+            .borrow()
+            .presentation
+            .display_bounds_query
+            .as_ref()
+            .and_then(|query| query(index, usable))
+    }
+
+    // MARK: - Global hotkeys
+
+    /// Registers a system-wide hotkey; `handler` runs on the UI thread when it
+    /// fires. Returns false when the platform has no global-hotkey facility.
+    pub fn register_hotkey(&self, hotkey: HotKey, handler: Rc<dyn Fn()>) -> bool {
+        self.bindings
+            .borrow()
+            .hotkeys
+            .register_hotkey_action
+            .as_ref()
+            .is_some_and(|register| register(hotkey, handler))
+    }
+
+    /// Removes a previously registered hotkey by id.
+    pub fn unregister_hotkey(&self, id: i32) {
+        if let Some(unregister) = self
+            .bindings
+            .borrow()
+            .hotkeys
+            .unregister_hotkey_action
+            .clone()
+        {
+            unregister(id);
         }
     }
 
@@ -229,6 +279,29 @@ impl AppDisplayHandle {
         if let Some(action) = action {
             action(title);
         }
+    }
+
+    /// Moves the main window's top-left corner to (x, y) in window units.
+    pub fn set_window_position(&self, x: f32, y: f32) {
+        let action = self
+            .bindings
+            .borrow()
+            .main_window
+            .set_main_window_position_action
+            .clone();
+        if let Some(action) = action {
+            action(x, y);
+        }
+    }
+
+    /// Current main-window top-left corner in window units.
+    pub fn window_position(&self) -> Option<(f32, f32)> {
+        self.bindings
+            .borrow()
+            .main_window
+            .main_window_position_query
+            .as_ref()
+            .and_then(|query| query())
     }
 
     pub fn minimize_window(&self) {

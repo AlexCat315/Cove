@@ -18,7 +18,9 @@ use crate::desktop::diagnostics::integration::{
 };
 use crate::desktop::diagnostics::performance_hud::PerformanceHud;
 use crate::desktop::diagnostics::session::{ApplicationDiagnostics, DiagnosticsQueries};
-use crate::desktop::display::controls::{MainWindowControls, PresentationControls, WindowControls};
+use crate::desktop::display::controls::{
+    HotKeyControls, MainWindowControls, PresentationControls, WindowControls,
+};
 use crate::desktop::display::{AppAuxiliaryWindowRequest, AppDisplayHandle, DisplayBindings};
 use crate::desktop::rendering::ThreadedWindowRenderer;
 use crate::desktop::rendering::context::AppRenderingContext;
@@ -158,6 +160,8 @@ struct ApplicationState {
     root_view: RefCell<Option<AnyView>>,
     chrome_collector: RefCell<WindowChromeHitTestCollector>,
     last_chrome_hit_test: RefCell<Option<WindowChromeHitTest>>,
+    /// Handlers for system-wide hotkeys, keyed by the registration id.
+    hotkey_handlers: RefCell<HashMap<i32, Rc<dyn Fn()>>>,
 }
 
 /// The high-level application host.
@@ -237,6 +241,9 @@ impl Application {
             shows_dock_icon: config.window.shows_dock_icon
                 && !(config.diagnostics.dev_tools.is_some()
                     && environment_flag("SDL_WINDOW_ACTIVATE_WHEN_SHOWN").as_deref() == Some("0")),
+            position: config.window.placement.and_then(|p| p.position),
+            display: config.window.placement.and_then(|p| p.display),
+            shape: config.window.shape,
         };
         let host = Sdl3PlatformHost::new(config.window.title.clone(), options);
         let portal_store = Rc::new(PortalStore::new());
@@ -282,6 +289,7 @@ impl Application {
             root_view: RefCell::new(None),
             chrome_collector: RefCell::new(WindowChromeHitTestCollector::new()),
             last_chrome_hit_test: RefCell::new(None),
+            hotkey_handlers: RefCell::new(HashMap::new()),
         });
         let application = Self { state };
         application.apply_frame_rate_policy();
@@ -686,6 +694,12 @@ impl Application {
             if matches!(event, cove_platform::InputEvent::ExternalDrop(_)) {
                 Application::route_external_drop(&state, event);
             }
+            if let cove_platform::InputEvent::GlobalHotkey(id) = event {
+                let handler = state.hotkey_handlers.borrow().get(id).cloned();
+                if let Some(handler) = handler {
+                    handler();
+                }
+            }
             false
         }));
     }
@@ -719,6 +733,14 @@ impl Application {
             current_runtime_display_refresh_rate: Some(Rc::new({
                 let host = host.clone();
                 move || host.current_display_refresh_rate(None)
+            })),
+            display_count_query: Some(Rc::new({
+                let host = host.clone();
+                move || host.display_count()
+            })),
+            display_bounds_query: Some(Rc::new({
+                let host = host.clone();
+                move |index: usize, usable: bool| host.display_bounds(index, usable)
             })),
         };
 
@@ -794,6 +816,18 @@ impl Application {
                     }
                 }
             })),
+            set_main_window_position_action: Some(Rc::new({
+                let host = host.clone();
+                move |x: f32, y: f32| {
+                    if let Some(id) = host.main_window() {
+                        host.set_window_position(id, x, y);
+                    }
+                }
+            })),
+            main_window_position_query: Some(Rc::new({
+                let host = host.clone();
+                move || host.main_window().and_then(|id| host.window_position(id))
+            })),
         };
 
         let windows = WindowControls {
@@ -831,6 +865,30 @@ impl Application {
             presentation,
             main_window,
             windows,
+            hotkeys: HotKeyControls {
+                register_hotkey_action: Some(Rc::new({
+                    let state = state.clone();
+                    let host = host.clone();
+                    move |hotkey: cove_shell::HotKey, handler: Rc<dyn Fn()>| {
+                        if !host.register_hotkey(hotkey) {
+                            return false;
+                        }
+                        state
+                            .hotkey_handlers
+                            .borrow_mut()
+                            .insert(hotkey.id, handler);
+                        true
+                    }
+                })),
+                unregister_hotkey_action: Some(Rc::new({
+                    let state = state.clone();
+                    let host = host.clone();
+                    move |id: i32| {
+                        host.unregister_hotkey(id);
+                        state.hotkey_handlers.borrow_mut().remove(&id);
+                    }
+                })),
+            },
             open_auxiliary_window: Some(Rc::new({
                 let application = Application {
                     state: state.clone(),
@@ -1067,7 +1125,7 @@ impl Application {
     /// retries frames the renderer could not present.
     fn deliver_open_documents(&self) {
         /* Services the OS delivered while this thread was busy: the provider
-           enqueues on the main thread, the handler must run here. */
+        enqueues on the main thread, the handler must run here. */
         cove_shell::services::poll();
         cove_shell::status_item::poll();
         let documents = self.state.host.take_open_documents();
@@ -1288,6 +1346,9 @@ impl Application {
         }
         let mut settings =
             AppWindowRenderSettings::resolve(&state.config, state.config.window.rendering);
+        // A shaped window (floating widget) needs its clear pixels to be truly
+        // transparent; a merely translucent window shows the platform material.
+        settings.shaped = state.config.window.shape.is_some();
         if state.host.translucent() {
             // Premultiplied clear: untouched pixels reveal the platform material.
             settings.clear_color = [0.0; 4];
