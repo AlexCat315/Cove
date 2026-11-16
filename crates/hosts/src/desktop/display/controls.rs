@@ -38,6 +38,9 @@ pub struct MainWindowControls {
     pub set_main_window_title_action: Option<std::rc::Rc<dyn Fn(&str)>>,
     pub set_main_window_position_action: Option<std::rc::Rc<dyn Fn(f32, f32)>>,
     pub main_window_position_query: Option<std::rc::Rc<dyn Fn() -> Option<(f32, f32)>>>,
+    /// Resizes the main window at runtime. Shaped windows rebuild their mask
+    /// for the new size, so a floating widget can grow from a dot into a menu.
+    pub set_main_window_size_action: Option<std::rc::Rc<dyn Fn(f32, f32)>>,
 }
 
 /// Actions the host wires to any window by identifier.

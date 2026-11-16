@@ -11,7 +11,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
-struct CoveShellWindow { SDL_Window *window; void *metal_view,*layer,*apple; SDL_Cursor *cursors[12]; CoveShellChrome chrome; CoveShellRect *drag,*non_drag; bool has_chrome; };
+struct CoveShellWindow { SDL_Window *window; void *metal_view,*layer,*apple; SDL_Cursor *cursors[12]; CoveShellChrome chrome; CoveShellRect *drag,*non_drag; bool has_chrome; int shape_kind; float shape_radius; bool has_shape; };
 static SDL_AtomicInt wake_pending;
 static SDL_AtomicInt wake_lost;
 static SDL_AtomicInt initialized;
@@ -118,6 +118,14 @@ bool cove_shell_set_window_shape(CoveShellWindow *h,int kind,float radius) { COV
     }
     bool ok = SDL_SetWindowShape(h->window, mask);
     SDL_DestroySurface(mask);
+    /* Remember the shape so a later resize can rebuild the mask at the new
+       window size. The mask is pixel-sized, so SDL_SetWindowSize alone would
+       leave a shaped window clipped to its original circle. */
+    if (ok) {
+        h->shape_kind = kind;
+        h->shape_radius = radius;
+        h->has_shape = true;
+    }
     return ok;
 }
 
@@ -384,7 +392,7 @@ void cove_shell_command(CoveShellWindow *h,int command,int a,int b) { COVE_ASSER
 #if defined(__APPLE__)
     if(cove_shell_apple_command(h->apple,command,a))return;
 #endif
-    switch(command){case 1:SDL_SetWindowPosition(h->window,a,b);break;case 2:SDL_SetWindowSize(h->window,a,b);break;case 3:SDL_RaiseWindow(h->window);break;case 4:SDL_MinimizeWindow(h->window);break;case 5:SDL_MaximizeWindow(h->window);break;case 6:SDL_RestoreWindow(h->window);break;case 7:SDL_HideWindow(h->window);break;case 8:SDL_ShowWindow(h->window);break;case 9:SDL_ShowWindowSystemMenu(h->window,a,b);break;case 10:SDL_SetWindowFullscreen(h->window,a!=0);break;case 11:SDL_SetWindowAlwaysOnTop(h->window,a!=0);break;case 12:SDL_SetWindowMinimumSize(h->window,a,b);break;}
+    switch(command){case 1:SDL_SetWindowPosition(h->window,a,b);break;case 2:SDL_SetWindowSize(h->window,a,b);if(h->has_shape)cove_shell_set_window_shape(h,h->shape_kind,h->shape_radius);break;case 3:SDL_RaiseWindow(h->window);break;case 4:SDL_MinimizeWindow(h->window);break;case 5:SDL_MaximizeWindow(h->window);break;case 6:SDL_RestoreWindow(h->window);break;case 7:SDL_HideWindow(h->window);break;case 8:SDL_ShowWindow(h->window);break;case 9:SDL_ShowWindowSystemMenu(h->window,a,b);break;case 10:SDL_SetWindowFullscreen(h->window,a!=0);break;case 11:SDL_SetWindowAlwaysOnTop(h->window,a!=0);break;case 12:SDL_SetWindowMinimumSize(h->window,a,b);break;}
 }
 void cove_shell_set_title(CoveShellWindow *h,const char *title){ COVE_ASSERT_MAIN();
     if(!h||!title)return;

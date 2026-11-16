@@ -828,6 +828,14 @@ impl Application {
                 let host = host.clone();
                 move || host.main_window().and_then(|id| host.window_position(id))
             })),
+            set_main_window_size_action: Some(Rc::new({
+                let host = host.clone();
+                move |width: f32, height: f32| {
+                    if let Some(id) = host.main_window() {
+                        host.set_window_size(id, width, height);
+                    }
+                }
+            })),
         };
 
         let windows = WindowControls {

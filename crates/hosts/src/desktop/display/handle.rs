@@ -304,6 +304,21 @@ impl AppDisplayHandle {
             .and_then(|query| query())
     }
 
+    /// Resizes the main window in window units. For shaped windows the shape
+    /// mask is regenerated at the new size, so an elliptical widget can expand
+    /// into a menu disc and collapse back without losing its clipping.
+    pub fn set_window_size(&self, width: f32, height: f32) {
+        let action = self
+            .bindings
+            .borrow()
+            .main_window
+            .set_main_window_size_action
+            .clone();
+        if let Some(action) = action {
+            action(width, height);
+        }
+    }
+
     pub fn minimize_window(&self) {
         let action = self
             .bindings

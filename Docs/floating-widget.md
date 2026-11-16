@@ -4,9 +4,10 @@
 
 ## 参考落地：RichZip / MugenZip 悬浮球
 
-`../RichZip/src/widget.rs` 是一份完整的产品级示例：`mugenzip --widget` 用四个原语拼出一个「拖文件进来即解压」的圆形悬浮球。
+`../RichZip/src/widget.rs` 是一份完整的产品级示例：`mugenzip --widget` 用四个原语拼出一个「拖文件进来即解压」的玻璃质感悬浮球。
 
-- **窗口**：132×132 正方形 + `WindowShape::Ellipse` 成正圆；`shows_dock_icon = false` 去掉任务栏；`clear_color = [0,0,0,0]` 透明背景；启动后用 `display_bounds(0, true)` + `set_window_position` 停在主屏右上角。
+- **窗口**：148×148 正方形 + `WindowShape::Ellipse` 成正圆（视觉球直径 132，四周留 8pt 给光晕）；`shows_dock_icon = false` 去掉任务栏；`clear_color = [0,0,0,0]` 透明背景；启动后用 `display_bounds` + `set_window_position` 停在主屏右上角（display 查询在 SDL 启动初期可能为空，代码会在 UI run loop 上重试，usable 失败回退到 full bounds）。
+- **球面**：自定义 `PrimitiveView`（`BallCanvas`）用 `DrawList` 直接绘制，不是贴一张圆色块。球面明暗用单个 `add_disk_shaded`（上亮下暗 + 菲涅尔边缘光，平滑无接缝），高光/反弹光用几层独立的小 `add_disk_shaded` 叠加成柔和光斑，外圈用 `add_shaded_annulus` 做光晕，中心图标走 `add_image_mask_quad`（白色 tint）。hover / 拖入目标状态写进 draw identity，触发球面实时变色提亮。
 - **拖放**：`FileDropZone` 铺满球面，只收压缩包扩展名；回调直接调 `extract_service::run(path, IntoFolder)`（与资源管理器「解压到同名文件夹」动词同一条 headless 链路），解压后 reveal 目录，全程不弹浏览窗口。
 - **托盘**：`status_item::install` 提供「打开主界面 / 显示隐藏 / 退出」；点击球用 `std::process::Command` 另起一个无 `--widget` 的进程打开完整浏览器。
 - **热键**：`Ctrl+Shift+K` 经 `register_hotkey` 切换 `hide_window` / `show_window`。
@@ -37,7 +38,10 @@ app.window.shape = Some(WindowShape::RoundedRect { radius: 18.0 });
 
 Windows 实现要点（否则圆外会是一块浅灰方块，而不是透明）：`SDL_SetWindowShape` 用 `SetWindowRgn` 裁出椭圆的命中/绘制区域，但 DX12 的 DirectComposition swapchain 会绕过 Win32 region。异形窗口必须走一条独立的呈现路径——`SurfaceDescriptor.shaped = true` 时，`dx12/composition.rs` 跳过 `DwmExtendFrameIntoClientArea(-1…)` 和 `DWMWA_SYSTEMBACKDROP_TYPE=TRANSIENTWINDOW`（它们会在整个客户区铺 DWM 磨砂灰，填满被裁掉的圆角）。该标志由 `AppWindowRenderSettings.shaped` 从 `WindowConfiguration::shape.is_some()` 一路传到合成层。跳过 backdrop 后，clear 像素在 `AlphaMode=PREMULTIPLIED` 的 DirectComposition swapchain 上真正透明，圆外直接合成到桌面。
 
-视觉层注意（实测）：在 shaped 透明窗口里，裸 `Text` / `Icon` 视图不会绘制；内容要用 `Button::title` / `Button::icon` 这类内置 label 路径，并放在被裁剪的圆盘**之外**的 ZStack 层（放进被 `clipped()` 的 zone 里 label 会消失）。
+视觉层注意（实测）：
+
+- `DrawList::add_disk_shaded` 只把圆盘细分成「圆心 + 外圈」两圈顶点，中间靠线性插值。因此**不能**把依赖中间像素坐标的局部着色（例如高光斑）直接写进它的 `shade` 闭包——采样不到，结果是哑光色块加插值色带。正确做法：球面整体明暗用一个 disk，局部高光/反光各自用独立的小 disk 叠加（disk 的圆心顶点能被采样到峰值）。也不要用很多同心 `add_shaded_annulus` 堆径向网格——相邻环的 1px 羽化边会形成摩尔纹。
+- 在 shaped 透明窗口里，纯 alpha-mask 的裸 `Text` / `Icon` 视图可能不绘制（其 coverage quad 底下没有已填充像素参与合成）。图标最稳妥的做法是在自定义 `PrimitiveView` 里用 `Image::resolve_resource` 取纹理，再 `add_image_mask_quad` 以白色 tint 画在球面上——与球面同处一个 DrawList，合成正确。参考 `RichZip/src/widget.rs` 的 `BallCanvas`。
 
 实现走 vendored SDL3 的 `SDL_SetWindowShape`，它按平台分派到各自的原生机制，因此一套配置覆盖三平台：
 
