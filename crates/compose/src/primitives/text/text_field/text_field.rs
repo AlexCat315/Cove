@@ -38,7 +38,8 @@ use super::snippet::TextSnippetSession;
 use super::text_completion_session::TextCompletionSession;
 use super::text_field_code_editing::indented_newline;
 use super::text_field_editing::{
-    delete_selection, edit_clock, insert_replacing_selection, insert_replacing_selection_limited,
+    caret_state, delete_selection, edit_clock, insert_replacing_selection,
+    insert_replacing_selection_limited,
 };
 use super::text_field_layout_engine::{
     DOCUMENT_LAYOUT_KEY, FIELD_STATE_KEY, FieldCompositionState, FieldLayoutInputs,
@@ -1433,6 +1434,7 @@ fn install_text_input_client(node: &Node, field: &TextField, state: &Rc<RefCell<
         };
         let buffer = publish_state.borrow().buffer.clone();
         notify_composition(&owner, &publish_state);
+        notify_caret(&owner, &publish_state);
         if !buffer.has_same_contents(&publish_binding.get()) {
             publish_binding.set(buffer.clone());
             if let Some(handler) = owner.attachment::<Rc<dyn Fn(&TextBuffer)>>("__textfield_change")
@@ -1663,6 +1665,15 @@ fn notify_composition(node: &Node, state: &Rc<RefCell<FieldState>>) {
     }
 }
 
+/// Publishes caret and selection through the caller's `on_caret_change`.
+/// Every commit point that can move the caret calls this, so observers see
+/// pointer, keyboard, platform and programmatic moves alike.
+fn notify_caret(node: &Node, state: &Rc<RefCell<FieldState>>) {
+    if let Some(handler) = node.attachment::<Rc<dyn Fn(TextFieldCaretState)>>("__textfield_caret") {
+        handler(caret_state(&state.borrow()));
+    }
+}
+
 fn install_interaction(
     node: &Node,
     field: &TextField,
@@ -1847,6 +1858,7 @@ fn install_interaction(
                         {
                             handler();
                         }
+                        notify_caret(&owner, &pointer_state);
                         owner.mark_render_dirty(cove_core::scene::InvalidationSource::style_set(
                             "textFieldClear",
                         ));
@@ -1893,6 +1905,7 @@ fn install_interaction(
                     state.is_focused = true;
                     drop(state);
                     notify_composition(&owner, &pointer_state);
+                    notify_caret(&owner, &pointer_state);
                     owner.mark_render_dirty(cove_core::scene::InvalidationSource::style_set(
                         "textFieldPointer",
                     ));
@@ -1941,6 +1954,7 @@ fn install_interaction(
                     Point::new(event.x, event.y),
                 ) {
                     motion_state.borrow_mut().move_cursor(index, true, None);
+                    notify_caret(&owner, &motion_state);
                     owner.mark_render_dirty(cove_core::scene::InvalidationSource::style_set(
                         "textFieldSelection",
                     ));
@@ -1986,6 +2000,7 @@ fn install_interaction(
             {
                 handler(&buffer);
             }
+            notify_caret(&owner, &text_state);
             if let Some(session) = owner.first_resource::<TextCompletionSession>() {
                 session.activity(false);
             }
@@ -2086,6 +2101,8 @@ fn install_interaction(
                         state.selection.anchor = (start != end).then_some(start);
                         state.selection.cursor_index = end;
                         state.record_activity();
+                        drop(state);
+                        notify_caret(&owner, &key_state);
                     }
                     return EventResult::Handled;
                 }
@@ -2163,6 +2180,8 @@ fn install_interaction(
                         let mut state = key_state.borrow_mut();
                         let header = state.buffer.line_range(hidden.start.saturating_sub(1));
                         state.move_cursor(header.end.saturating_sub(1), false, None);
+                        drop(state);
+                        notify_caret(&owner, &key_state);
                     }
                     owner.mark_render_dirty(cove_core::scene::InvalidationSource::style_set(
                         "textFieldGutter",
@@ -2215,6 +2234,7 @@ fn install_interaction(
                             handler(&buffer);
                         }
                     }
+                    notify_caret(&owner, &paste_state);
                     owner.mark_render_dirty(cove_core::scene::InvalidationSource::style_set(
                         "textFieldPaste",
                     ));
@@ -2262,6 +2282,7 @@ fn install_interaction(
             let result = edit();
             if result == EventResult::Handled {
                 notify_composition(&owner, &key_state);
+                notify_caret(&owner, &key_state);
                 owner.mark_render_dirty(cove_core::scene::InvalidationSource::style_set(
                     "textFieldKey",
                 ));

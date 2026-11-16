@@ -42,7 +42,9 @@ pub enum ServiceError {
 impl fmt::Display for ServiceError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Unsupported => formatter.write_str("this platform publishes no runtime shell services"),
+            Self::Unsupported => {
+                formatter.write_str("this platform publishes no runtime shell services")
+            }
         }
     }
 }
@@ -65,7 +67,8 @@ thread_local! {
 
 /// Selector → verb id. Shared across threads and holds no callbacks, so the
 /// main thread can resolve an incoming service without borrowing UI state.
-static SELECTORS: std::sync::Mutex<Vec<(&'static str, &'static str)>> = std::sync::Mutex::new(Vec::new());
+static SELECTORS: std::sync::Mutex<Vec<(&'static str, &'static str)>> =
+    std::sync::Mutex::new(Vec::new());
 /// Activations handed over by the main thread; drained by [`poll`].
 static QUEUE: std::sync::Mutex<Vec<Activation>> = std::sync::Mutex::new(Vec::new());
 
@@ -80,14 +83,17 @@ static QUEUE: std::sync::Mutex<Vec<Activation>> = std::sync::Mutex::new(Vec::new
 /// the bundle has to be registered with LaunchServices — an unpackaged
 /// `cargo run` binary installs fine and still shows nothing in Finder.
 #[cfg(target_os = "macos")]
-pub fn install(verbs: &[ShellVerb], handler: impl Fn(&str, Vec<String>) + 'static) -> Result<(), ServiceError> {
+pub fn install(
+    verbs: &[ShellVerb],
+    handler: impl Fn(&str, Vec<String>) + 'static,
+) -> Result<(), ServiceError> {
     HANDLER.with(|cell| *cell.borrow_mut() = Some(Box::new(handler)));
     SELECTORS
         .lock()
         .unwrap_or_else(|error| error.into_inner())
         .extend(verbs.iter().map(|verb| (verb.selector, verb.id)));
     /* Apps register while building their launch object, before SDL owns the
-       main thread, so the provider is applied on the first tick instead. */
+    main thread, so the provider is applied on the first tick instead. */
     flush_pending();
     Ok(())
 }
@@ -95,7 +101,10 @@ pub fn install(verbs: &[ShellVerb], handler: impl Fn(&str, Vec<String>) + 'stati
 /// Publishes `verbs` to the platform file menu. See the macOS overload; other
 /// platforms have no runtime publication path.
 #[cfg(not(target_os = "macos"))]
-pub fn install(_verbs: &[ShellVerb], _handler: impl Fn(&str, Vec<String>) + 'static) -> Result<(), ServiceError> {
+pub fn install(
+    _verbs: &[ShellVerb],
+    _handler: impl Fn(&str, Vec<String>) + 'static,
+) -> Result<(), ServiceError> {
     Err(ServiceError::Unsupported)
 }
 
@@ -107,7 +116,11 @@ pub fn flush_pending() {
     if !crate::is_main_thread() {
         return;
     }
-    if SELECTORS.lock().unwrap_or_else(|error| error.into_inner()).is_empty() {
+    if SELECTORS
+        .lock()
+        .unwrap_or_else(|error| error.into_inner())
+        .is_empty()
+    {
         return;
     }
     INSTALLED.call_once(|| {
@@ -157,7 +170,10 @@ pub fn yield_to_background() {}
 /// without the app coming back.
 #[cfg(target_os = "macos")]
 pub fn reveal(path: &Path) {
-    let Some(path) = path.to_str().and_then(|path| std::ffi::CString::new(path).ok()) else {
+    let Some(path) = path
+        .to_str()
+        .and_then(|path| std::ffi::CString::new(path).ok())
+    else {
         return;
     };
     bridge::reveal_path(path.as_ptr());
@@ -175,7 +191,9 @@ mod bridge {
     use std::panic::{AssertUnwindSafe, catch_unwind};
 
     unsafe extern "C" {
-        fn cove_shell_services_install(callback: extern "C" fn(*const c_char, *const *const c_char, usize) -> *const c_char) -> bool;
+        fn cove_shell_services_install(
+            callback: extern "C" fn(*const c_char, *const *const c_char, usize) -> *const c_char,
+        ) -> bool;
         fn cove_shell_wake();
         fn cove_shell_services_yield();
         fn cove_shell_services_reveal(path: *const c_char);
@@ -212,23 +230,33 @@ mod bridge {
         match message {
             Some(text) => MESSAGE.with(|slot| {
                 *slot.borrow_mut() = CString::new(text.replace('\0', " ")).ok();
-                slot.borrow().as_ref().map_or(std::ptr::null(), |text| text.as_ptr())
+                slot.borrow()
+                    .as_ref()
+                    .map_or(std::ptr::null(), |text| text.as_ptr())
             }),
             None => std::ptr::null(),
         }
     }
 
-    fn dispatch(selector: *const c_char, paths: *const *const c_char, count: usize) -> Option<String> {
+    fn dispatch(
+        selector: *const c_char,
+        paths: *const *const c_char,
+        count: usize,
+    ) -> Option<String> {
         let selector = if selector.is_null() {
             return Some("service arrived without a selector".to_string());
         } else {
             // SAFETY: the provider passes a NUL-terminated selector for this call.
-            unsafe { CStr::from_ptr(selector) }.to_string_lossy().into_owned()
+            unsafe { CStr::from_ptr(selector) }
+                .to_string_lossy()
+                .into_owned()
         };
         /* AppKit invokes the full selector — the `NSMessage` from NSServices with
-           `userData:error:` appended — while registrations carry just the
-           message part, so match on that. */
-        let message = selector.strip_suffix(":userData:error:").unwrap_or(&selector);
+        `userData:error:` appended — while registrations carry just the
+        message part, so match on that. */
+        let message = selector
+            .strip_suffix(":userData:error:")
+            .unwrap_or(&selector);
         let Some(verb) = SELECTORS
             .lock()
             .unwrap_or_else(|error| error.into_inner())
@@ -246,7 +274,11 @@ mod bridge {
                 continue;
             }
             // SAFETY: each entry is a NUL-terminated UTF-8 path owned by the call.
-            selected.push(unsafe { CStr::from_ptr(entry) }.to_string_lossy().into_owned());
+            selected.push(
+                unsafe { CStr::from_ptr(entry) }
+                    .to_string_lossy()
+                    .into_owned(),
+            );
         }
         if selected.is_empty() {
             return Some("no files were selected".to_string());
@@ -254,7 +286,10 @@ mod bridge {
         QUEUE
             .lock()
             .unwrap_or_else(|error| error.into_inner())
-            .push(Activation { verb, paths: selected });
+            .push(Activation {
+                verb,
+                paths: selected,
+            });
         // SAFETY: wakes the platform loop; thread-safe by contract.
         unsafe { cove_shell_wake() };
         None
