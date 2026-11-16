@@ -206,7 +206,7 @@ bool cove_shell_hotkey_register(int id,unsigned mods,int key) {
         SDL_Keycode kc = SDL_GetKeyFromName([[[NSString stringWithFormat:@"%c",(char)(key+'a'-'A')] lowercaseString] UTF8String]);
         keyCode = (UInt32)SDL_GetScancodeFromKey(kc, NULL);
     } else if (key >= '0' && key <= '9') {
-        SDL_Keycode kc = SDL_GetKeyFromName([NSString stringWithFormat:@"%d",key-'0'] UTF8String);
+        SDL_Keycode kc = SDL_GetKeyFromName([[NSString stringWithFormat:@"%d", key-'0'] UTF8String]);
         keyCode = (UInt32)SDL_GetScancodeFromKey(kc, NULL);
     } else {
         keyCode = (UInt32)key;
