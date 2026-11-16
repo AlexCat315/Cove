@@ -17,23 +17,18 @@
 //! of truth for paths, labels and command lines.
 //!
 //! Linux has neither mechanism: every file manager has its own (Nautilus
-//! scripts, Dolphin service menus, Thunar actions, Nemo actions). Nothing here
-//! publishes on Linux yet, and [`install`] reports [`ServiceError::Unsupported`].
+//! scripts, Dolphin service menus, Thunar actions, Nemo actions). There is no
+//! runtime publication path, so [`install`] reports [`ServiceError::Unsupported`];
+//! the installer writes those action files via `cove-package` instead.
 
 use std::fmt;
-use std::path::Path;
 
-/// A verb published to the OS file menu.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct ShellVerb {
-    /// Stable id handed to the installed handler; also the Windows key name.
-    pub id: &'static str,
-    /// Menu label. Falls back to `id`, because an unlabelled descriptor is
-    /// unusable as a menu entry.
-    pub label: Option<&'static str>,
-    /// macOS: the `NSMessage` selector declared in the bundle's `NSServices`.
-    pub selector: &'static str,
-}
+// Descriptors and the registry key plan live in a dependency-free crate so the
+// installer plans the exact same keys the runtime installs.
+pub use cove_shell_verbs::{
+    MultiSelectModel, RegistryEntry, RegistryScope, ShellVerb, VerbError, VerbTarget,
+    windows_verb_entries, windows_verb_entries_with, windows_verb_key,
+};
 
 /// Why a service request could not be published.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -224,127 +219,5 @@ mod bridge {
         // SAFETY: wakes the platform loop; thread-safe by contract.
         unsafe { cove_shell_wake() };
         None
-    }
-}
-
-/// Registry hive a verb key lives under.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum RegistryScope {
-    /// `HKCU\Software\Classes` — per-user install, no elevation.
-    CurrentUser,
-    /// `HKCR` — machine-wide; writing it requires elevation.
-    Machine,
-}
-
-impl RegistryScope {
-    fn root(self) -> &'static str {
-        match self {
-            Self::CurrentUser => "HKCU\\Software\\Classes",
-            Self::Machine => "HKCR",
-        }
-    }
-}
-
-/// Where Explorer offers the verb.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum VerbTarget {
-    /// Right-click on any file (`*\shell`).
-    AnyFile,
-    /// Right-click on a folder (`Directory\shell`).
-    Directory,
-    /// Right-click on empty space inside a folder (`Directory\Background\shell`).
-    Background,
-    /// Right-click on one extension (`SystemFileAssociations\.zip\shell`).
-    Extension(&'static str),
-}
-
-impl VerbTarget {
-    fn key_suffix(self) -> String {
-        match self {
-            Self::AnyFile => "*".to_string(),
-            Self::Directory => "Directory".to_string(),
-            Self::Background => "Directory\\Background".to_string(),
-            Self::Extension(extension) => format!("SystemFileAssociations\\.{}", extension.trim_start_matches('.')),
-        }
-    }
-}
-
-/// One registry value an installer has to write.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct RegistryEntry {
-    pub hive: &'static str,
-    /// Key below the hive; a `name` of `None` means the key's default value.
-    pub key: String,
-    pub name: Option<String>,
-    pub value: String,
-}
-
-/// Registry values publishing `verb` as a static Explorer verb whose command
-/// runs `exe` with the clicked path.
-///
-/// Static verbs are legacy entries: Windows 11 folds them into "Show more
-/// options", so a top-level entry needs an `IExplorerCommand` COM handler
-/// instead. `MultiSelectModel` is written as `Single` because a static verb is
-/// launched once per selected item; `Player` would be needed for one launch
-/// carrying the whole selection.
-pub fn windows_verb_entries(
-    target: VerbTarget,
-    verb: &ShellVerb,
-    exe: &Path,
-    scope: RegistryScope,
-) -> Vec<RegistryEntry> {
-    let root = scope.root();
-    let hive = if scope == RegistryScope::CurrentUser { "HKCU" } else { "HKCR" };
-    let key = format!("{}\\{}\\shell\\{}", root, target.key_suffix(), verb.id);
-    let command_key = format!("{key}\\command");
-    let exe = exe.display().to_string();
-    vec![
-        RegistryEntry { hive, key: key.clone(), name: Some("MUIVerb".to_string()), value: verb.label.unwrap_or(verb.id).to_string() },
-        RegistryEntry { hive, key: key.clone(), name: Some("Icon".to_string()), value: format!("\"{exe}\",0") },
-        RegistryEntry { hive, key: key.clone(), name: Some("MultiSelectModel".to_string()), value: "Single".to_string() },
-        // The default value of the `command` subkey is the command line.
-        RegistryEntry { hive, key: command_key, name: None, value: format!("\"{exe}\" \"%1\"") },
-    ]
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    const VERB: ShellVerb = ShellVerb { id: "extract", label: Some("Extract here"), selector: "coveExtractService:" };
-
-    #[test]
-    fn user_scope_any_file_verb_writes_under_classes() {
-        let entries = windows_verb_entries(VerbTarget::AnyFile, &VERB, Path::new("C:/Apps/zip.exe"), RegistryScope::CurrentUser);
-        assert_eq!(entries.len(), 4);
-        assert_eq!(entries[0].hive, "HKCU");
-        assert_eq!(entries[0].key, "HKCU\\Software\\Classes\\*\\shell\\extract");
-        assert_eq!(entries[0].name.as_deref(), Some("MUIVerb"));
-        assert_eq!(entries[0].value, "Extract here");
-        assert_eq!(entries[3].key, "HKCU\\Software\\Classes\\*\\shell\\extract\\command");
-        assert_eq!(entries[3].name, None);
-        assert_eq!(entries[3].value, "\"C:/Apps/zip.exe\" \"%1\"");
-    }
-
-    #[test]
-    fn machine_scope_uses_hkcr_and_needs_elevation() {
-        let entries = windows_verb_entries(VerbTarget::Directory, &VERB, Path::new("C:/zip.exe"), RegistryScope::Machine);
-        assert_eq!(entries[0].hive, "HKCR");
-        assert_eq!(entries[0].key, "HKCR\\Directory\\shell\\extract");
-    }
-
-    #[test]
-    fn background_and_extension_targets_get_their_own_keys() {
-        let background = windows_verb_entries(VerbTarget::Background, &VERB, Path::new("C:/zip.exe"), RegistryScope::CurrentUser);
-        assert_eq!(background[0].key, "HKCU\\Software\\Classes\\Directory\\Background\\shell\\extract");
-        let zip = windows_verb_entries(VerbTarget::Extension(".zip"), &VERB, Path::new("C:/zip.exe"), RegistryScope::CurrentUser);
-        assert_eq!(zip[0].key, "HKCU\\Software\\Classes\\SystemFileAssociations\\.zip\\shell\\extract");
-    }
-
-    #[test]
-    fn command_keeps_an_executable_path_with_spaces_quoted() {
-        let entries = windows_verb_entries(VerbTarget::AnyFile, &VERB, Path::new("C:/Program Files/Cove/zip.exe"), RegistryScope::CurrentUser);
-        assert_eq!(entries[3].value, "\"C:/Program Files/Cove/zip.exe\" \"%1\"");
-        assert_eq!(entries[1].value, "\"C:/Program Files/Cove/zip.exe\",0");
     }
 }

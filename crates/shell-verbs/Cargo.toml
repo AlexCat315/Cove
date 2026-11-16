@@ -1,0 +1,10 @@
+[package]
+name = "cove-shell-verbs"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Pure descriptors for OS file-menu verbs shared by the runtime shell and installers"
+
+[lints]
+workspace = true

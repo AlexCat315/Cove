@@ -12,6 +12,7 @@ members = [
     "crates/media",
     "crates/media-rhi",
     "crates/shell",
+    "crates/shell-verbs",
     "crates/runtime",
     "crates/compose",
     "crates/composition",
@@ -84,6 +85,7 @@ ffmpeg-sys-next = { path = "third-party/ffmpeg-sys-next", default-features = fal
 cpal = { version = "0.18.2", default-features = false }
 ndk-context = "0.1"
 cove-shell = { path = "crates/shell" }
+cove-shell-verbs = { path = "crates/shell-verbs" }
 cove-runtime = { path = "crates/runtime" }
 cove-composition = { path = "crates/composition" }
 cove-composition-macros = { path = "crates/composition-macros" }

@@ -629,6 +629,7 @@ dependencies = [
  "cove-devtools-cli",
  "cove-devtools-protocol",
  "cove-native-build",
+ "cove-shell-verbs",
  "ctrlc",
  "serde_json",
  "tempfile",
@@ -677,11 +678,16 @@ dependencies = [
  "cove-logging",
  "cove-native-build",
  "cove-platform",
+ "cove-shell-verbs",
  "libc",
  "objc2",
  "objc2-app-kit",
  "thiserror 2.0.21",
 ]
+
+[[package]]
+name = "cove-shell-verbs"
+version = "0.3.0"
 
 [[package]]
 name = "cove-system"

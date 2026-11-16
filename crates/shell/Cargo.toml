@@ -8,6 +8,7 @@ links = "cove_shell"
 [dependencies]
 cove-platform.workspace = true
 cove-logging.workspace = true
+cove-shell-verbs.workspace = true
 thiserror.workspace = true
 
 # Screen-colour sampling is a per-window-system backend. Only the target that

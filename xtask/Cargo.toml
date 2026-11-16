@@ -19,6 +19,7 @@ path = "src/cargo_main.rs"
 clap.workspace = true
 serde_json.workspace = true
 cove-native-build.workspace = true
+cove-shell-verbs.workspace = true
 cove-devtools-cli = { path = "../crates/devtools-cli" }
 cove-devtools-protocol.workspace = true
 base64 = "0.22"

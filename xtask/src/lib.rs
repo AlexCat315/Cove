@@ -10,6 +10,7 @@ mod devtools;
 mod process;
 mod project;
 mod setup_config;
+mod shell_verbs;
 
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use project::Project;
@@ -100,6 +101,53 @@ enum Command {
     Devices {
         #[arg(value_enum)]
         platform: Platform,
+    },
+    /// Install OS file-menu verbs for an application (registry on Windows,
+    /// Nautilus/Dolphin action files on Linux).
+    InstallShellVerbs {
+        /// Stable verb id, used as the registry key name and file stem.
+        #[arg(long)]
+        id: String,
+        /// Menu label; defaults to the id.
+        #[arg(long)]
+        label: Option<String>,
+        /// Where the verb appears; repeatable. Defaults to any-file + directory.
+        /// Values: any-file, directory, background, extension:<ext>
+        #[arg(long)]
+        target: Vec<String>,
+        /// MIME types for the Dolphin service menu; repeatable.
+        #[arg(long)]
+        mime: Vec<String>,
+        /// Absolute path to the executable the verb launches.
+        #[arg(long)]
+        exe: PathBuf,
+        /// Registry scope on Windows.
+        #[arg(long, value_enum, default_value_t = shell_verbs::ScopeArg::User)]
+        scope: shell_verbs::ScopeArg,
+        /// How Explorer passes a multi-file selection.
+        #[arg(long, value_enum, default_value_t = shell_verbs::MultiSelectArg::Single)]
+        multi_select: shell_verbs::MultiSelectArg,
+        /// Override the XDG data home on Linux; mainly for testing.
+        #[arg(long)]
+        data_home: Option<PathBuf>,
+        /// Print the plan without changing the machine.
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Remove verbs previously installed by `install-shell-verbs`.
+    UninstallShellVerbs {
+        #[arg(long)]
+        id: String,
+        /// Same targets used at install time; defaults to any-file + directory.
+        #[arg(long)]
+        target: Vec<String>,
+        #[arg(long, value_enum, default_value_t = shell_verbs::ScopeArg::User)]
+        scope: shell_verbs::ScopeArg,
+        #[arg(long)]
+        data_home: Option<PathBuf>,
+        /// Print the plan without changing the machine.
+        #[arg(long)]
+        dry_run: bool,
     },
 }
 
@@ -355,6 +403,40 @@ fn execute(cli: Cli) -> Result<()> {
             Platform::Ios => apple::devices(),
             _ => Err("devices lists android or ios targets".into()),
         },
+        Command::InstallShellVerbs {
+            id,
+            label,
+            target,
+            mime,
+            exe,
+            scope,
+            multi_select,
+            data_home,
+            dry_run,
+        } => shell_verbs::install(shell_verbs::InstallOptions {
+            id,
+            label,
+            targets: target,
+            mime_types: mime,
+            exe,
+            scope,
+            multi_select,
+            data_home,
+            dry_run,
+        }),
+        Command::UninstallShellVerbs {
+            id,
+            target,
+            scope,
+            data_home,
+            dry_run,
+        } => shell_verbs::uninstall(shell_verbs::UninstallOptions {
+            id,
+            targets: target,
+            scope,
+            data_home,
+            dry_run,
+        }),
     }
 }
 

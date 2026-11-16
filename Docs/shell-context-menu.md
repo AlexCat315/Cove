@@ -9,7 +9,7 @@
 
 - 目标：在访达/资源管理器/文件管理器里右键文件或文件夹时，出现本应用的命令（如「解压到此处」「用本应用打开」）。
 - 三个平台的机制互不相同，**没有可用的统一抽象**；框架能提供的是「注册动词 → 把路径交给应用」，不是「一个跨平台右键菜单 API」。
-- 现状基线：框架内**不存在**任何 shell 扩展、文档类型、服务或注册表动词代码（全仓检索无 `IContextMenu`/`IExplorerCommand`/`NSServices`/`CFBundleDocumentTypes`/注册表写入）。Swift 参考版同样没有，属于新能力。
+- 现状基线：真正的 COM shell 扩展（`IContextMenu`/`IExplorerCommand`）、**已启用**的 `NSServices`/`CFBundleDocumentTypes` 清单声明、以及安装器外的注册表写入代码都不存在；框架提供的是通用动词登记 + 键计划，语义由应用声明。Swift 参考版同样没有，属于新能力。
 
 ### 各平台能力上限
 
@@ -199,11 +199,43 @@ Linux 没有 Windows 式的统一注册表动词，也没有 macOS 的服务清�
 | macOS 文档类型、服务清单声明 | 打包清单 `Templates/app/…/Info.plist` | 模板已有注释块，应用侧未启用 |
 | macOS 服务回调目标（provider） | shell 的 Apple 层（`apple.m`） | 已有（转发 provider + Rust 注册表） |
 | macOS Finder Sync / Action Extension | 独立 target + 打包器 | 缺 |
-| Windows 静态动词注册/卸载 | 安装器 | 键计划已有（`windows_verb_entries`），写入/卸载待安装器接入 |
+| Windows 静态动词注册/卸载 | 安装器（`cove-package` CLI） | 已有：键计划 + `reg.exe` 写入/递归删键 + `SHChangeNotify` |
 | Windows `IExplorerCommand` 处理器 | 独立 COM 服务器 + MSIX | 缺 |
-| Linux 各文件管理器 action 文件 | 安装器 | 缺 |
+| Linux 各文件管理器 action 文件 | 安装器（`cove-package` CLI） | 已有：Nautilus scripts + Dolphin service menus 的安装/卸载 |
 
-分层原则：动词的**文案与语义**（「解压到此处」、适用扩展名）属于应用；壳层只做「把命令和回调登记进平台机制、把路径送进 opened-documents」的通用工作，不在框架里硬编码压缩包语义。当前实现里 `ShellVerb` 只有 `id` / `label` / `selector`，扩展名与 UTI 仍由应用自己的清单声明——等 Linux 落地时再补成完整描述符。
+分层原则：动词的**文案与语义**（「解压到此处」、适用扩展名）属于应用；壳层只做「把命令和回调登记进平台机制、把路径送进 opened-documents」的通用工作，不在框架里硬编码压缩包语义。`ShellVerb` 只有 `id` / `label` / `selector`；扩展名、MIME 与 UTI 由调用方清单/安装命令提供。
+
+### 安装器接入（cove-package）
+
+Windows 注册表键与 Linux action 文件的**写入/卸载**由打包工具 `cove-package`（`xtask/`，即 `cargo xtask` / `cargo cove`）承担；纯计划逻辑在 [`cove-shell-verbs`](../crates/shell-verbs/src/lib.rs)，与运行时共用同一份键布局定义，安装器和测试不会出现两套路径。动词语义（id、文案、目标、MIME）通过命令行传入，框架不硬编码。
+
+```sh
+# Windows：写入静态动词键（HKCU，免提权）
+cargo xtask install-shell-verbs \
+  --id extract --label "解压到此处" \
+  --target any-file --target extension:zip \
+  --exe "C:\Program Files\MyApp\app.exe"
+
+# Windows：卸载（按 id + 同一组 target 定位并递归删键）
+cargo xtask uninstall-shell-verbs --id extract --target any-file --target extension:zip
+
+# Linux：安装 Nautilus script + Dolphin service menu 到 XDG data home
+cargo xtask install-shell-verbs \
+  --id extract --label "解压到此处" \
+  --mime application/zip \
+  --exe /opt/myapp/app
+
+cargo xtask uninstall-shell-verbs --id extract
+```
+
+- `--target` 可重复：`any-file` / `directory` / `background` / `extension:<ext>`；缺省为 `any-file` + `directory`。`--scope machine` 用 `HKCR`（需提权），默认 `user`。
+- `--multi-select single|document|player` 控制生成的 `MultiSelectModel`；默认 `single`（静态动词逐项启动）。一次拿到全部选中项须设 `player`，且接收侧按上文 `argv[1..]` 取多路径。
+- Linux 数据目录取 `XDG_DATA_HOME`，否则 `~/.local/share`（Windows 上为 `USERPROFILE`）；`--data-home <dir>` 可覆盖。Nautilus 脚本带可执行位，Dolphin 菜单缺省 MIME 为 `all/allfiles`。
+- 两个命令都支持 `--dry-run`：只逐行打印计划动作，不改动机器。卸载对不存在的键/文件是幂等的。
+- Windows 写入/删除后调用 `SHChangeNotify(SHCNE_ASSOCCHANGED)` 刷新外壳缓存；Linux 依赖文件管理器的常规探测。
+- macOS 无对应安装动作（服务在 `Info.plist` 声明，由打包器拷入），这两个命令在非 Windows/Linux 主机上返回明确错误。
+
+结构化覆盖：`cove-shell-verbs` 单测校验键路径、四类目标、`MultiSelectModel`、action 文件内容与非法 id 拒绝；`cove-package` 单测校验安装/卸载计划指向同一组键与文件，以及文件的实际写入与删除。外壳里的真实可见性仍是原生验收项（见下）。
 
 ## 待办与验收
 
@@ -211,8 +243,10 @@ Linux 没有 Windows 式的统一注册表动词，也没有 macOS 的服务清�
 - [x] Windows 静态动词键计划（`windows_verb_entries`），含四类目标与 `MultiSelectModel`。
 - [x] macOS 链路复核：打包成 `.app` → `lsregister -f` → 产物 `Info.plist` 带 `NSServices` → LaunchServices 登记 `service id` → `NSPerformService` 投递到应用（handler 收到 verb 与路径）。
 - [ ] 访达「服务」菜单的人工点击复核（本机无辅助功能授权，菜单项的文字停留未自动验证）。
-- [ ] Windows：安装器接入写入/卸载；`MultiSelectModel` 与多选语义、Win11「显示更多选项」可见性实测。
-- [ ] Linux：至少覆盖 Nautilus scripts 与 Dolphin service menus 两种机制。
+- [x] Windows：安装器接入写入/卸载（`cove-package` 的 `install-shell-verbs` / `uninstall-shell-verbs`，含 `SHChangeNotify` 与幂等卸载）；`MultiSelectModel` 可通过 `--multi-select` 配置。
+- [ ] Windows：Win11「显示更多选项」可见性与 `Player` 多选语义真机实测（原生验收，非结构化测试）。
+- [x] Linux：覆盖 Nautilus scripts 与 Dolphin service menus 两种机制（action 文件的生成、安装、卸载均有单测）。
+- [ ] Linux：在真实桌面会话中复核菜单项可见性与选中路径传递（原生验收）。
 - 验收原则：键位构造、注册表路径、pasteboard/参数解析可用结构化测试覆盖；外壳里的实际可见性与交互属原生验收，单列记录，不与结构测试混同。DevTools 不覆盖外壳菜单可见性。
 - 「改了没效果」排查顺序：是否真的注册（macOS `lsregister -dump | grep -i <app>`；Windows `reg query "HKCU\Software\Classes\*\shell\<verb>"`；Linux `xdg-mime query default <mime>`）、是否刷新了外壳缓存（Finder 重启 / `SHChangeNotify` / 注销重登）、是否为沙箱或开发构建。
 
