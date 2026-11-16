@@ -130,6 +130,36 @@ pb.writeObjects([URL(fileURLWithPath: "/tmp/a.zip") as NSURL]);
 print(NSPerformService("用 MugenZip 打开", pb))'
 ```
 
+### 2.1 就地解压动词（不打开归档）
+
+「解压到此处」这类入口不该打开归档视图：窗口是为了让人挑条目，而动词已经知道要什么。做法是给同一个 `NSServices` 再加条目，`install` 注册多个 `ShellVerb`（id 区分行为），handler 里走无界面路径：
+
+```rust
+ShellVerb { id: "extract-here",  label: Some("解压到此处"),      selector: "coveExtractHereService:"  },
+ShellVerb { id: "extract-folder", label: Some("解压到同名文件夹"), selector: "coveExtractFolderService:" },
+```
+
+- 解压本身只依赖 `mugenzip_core::open_archive` + `extract_entries(dest, &|_| true, smart=false, …)`，在工作线程跑，不碰 UI。`smart=false`：`解压到此处`就是归档所在目录，`解压到同名文件夹`已经先算出 `unique_output_dir`，再 smart 会套两层。
+- 服务投递必然激活应用一次（AppKit 行为），所以就地动词在 handler 开头调 `shell_services::yield_to_background()`（`NSApp hide:` 投到主队列），完成后 `shell_services::reveal(path)`（`NSWorkspace selectFile:`）在访达里定位结果。实测前台已回到调用前的应用。
+- 想彻底不进前台只能换机制（Finder Sync 扩展 + 主应用 XPC），代价是要给打包器加 `.appex` 支持。
+
+### 2.2 顶部菜单栏（status item）
+
+窗口被隐藏后仍需要一个入口，所以壳层提供菜单栏常驻图标：
+
+```rust
+status_item::install("archivebox", "MugenZip", &[
+    StatusEntry { id: "open",     title: "打开压缩包…" },
+    StatusEntry { id: "settings", title: "设置…" },
+    StatusEntry { id: "",         title: "" },      // 空标题 = 分隔线
+    StatusEntry { id: "quit",     title: "退出 MugenZip" },
+], move |id| match id { "open" => …, "settings" => …, _ => {} });
+```
+
+- 原生侧是 `NSStatusItem`，图标取 SF Symbol 并设 `template`，菜单标题即入口；`id == "quit"` 由原生直接 `terminate`，不依赖 UI 线程。
+- 点击先 `unhide` + `activate` 再回调：隐藏的应用不会 tick UI 线程，队列得靠恢复渲染才能被 `poll` 消费。所以菜单项天然会把窗口带回来，这是取舍，不是 bug。
+- 菜单栏拿不到访达的选中项；针对选中的动词仍然走服务（§2 与 §2.1）。
+
 ### 3. Action Extension（「快速操作」）
 
 希望命令出现在访达右键的「快速操作」里，现代 macOS 的做法是独立 **Action Extension**：独立 `.appex` target，`NSExtension` + `NSExtensionPrincipalClass`，实现 `NSExtensionRequestHandling`。

@@ -145,5 +145,17 @@ bool cove_shell_open_documents_take(char **out);
    success. False when no callback is supplied. */
 typedef const char *(*CoveShellServiceCallback)(const char *selector,const char *const *paths,size_t count);
 bool cove_shell_services_install(CoveShellServiceCallback callback);
+/* Hides the app after a service fires: an activation always brings it forward,
+   and a verb that works in place has no window to show. Thread-safe; the hide
+   runs on the main queue. */
+void cove_shell_services_yield(void);
+/* Selects `path` in a Finder window. Thread-safe; runs on the main queue. */
+void cove_shell_services_reveal(const char *path);
+/* Publishes a menu-bar extra (macOS status item) whose menu carries one entry
+   per title/id pair. An empty title inserts a separator; the id "quit" is wired
+   straight to terminate. `callback` receives the picked entry's index on the
+   main thread. Safe to call repeatedly to rebuild the menu. */
+typedef void (*CoveStatusItemCallback)(size_t index);
+bool cove_shell_status_item_install(const char *symbol,const char *tooltip,const char *const *titles,const char *const *ids,size_t count,CoveStatusItemCallback callback);
 #endif
 #endif

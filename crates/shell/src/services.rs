@@ -22,6 +22,7 @@
 //! the installer writes those action files via `cove-package` instead.
 
 use std::fmt;
+use std::path::Path;
 
 // Descriptors and the registry key plan live in a dependency-free crate so the
 // installer plans the exact same keys the runtime installs.
@@ -140,6 +141,32 @@ pub fn poll() {
     });
 }
 
+/// Hides the app after a service fires. Services arrive through an activation,
+/// so the app is in front even when the verb works in place and has no window to
+/// show. The hide itself is marshalled onto the main queue.
+#[cfg(target_os = "macos")]
+pub fn yield_to_background() {
+    bridge::yield_app();
+}
+
+/// Nothing to undo on a platform without runtime verbs.
+#[cfg(not(target_os = "macos"))]
+pub fn yield_to_background() {}
+
+/// Selects `path` in a Finder window, so an in-place verb can show its result
+/// without the app coming back.
+#[cfg(target_os = "macos")]
+pub fn reveal(path: &Path) {
+    let Some(path) = path.to_str().and_then(|path| std::ffi::CString::new(path).ok()) else {
+        return;
+    };
+    bridge::reveal_path(path.as_ptr());
+}
+
+/// No Finder to reveal into.
+#[cfg(not(target_os = "macos"))]
+pub fn reveal(_path: &Path) {}
+
 #[cfg(target_os = "macos")]
 mod bridge {
     use super::*;
@@ -150,6 +177,18 @@ mod bridge {
     unsafe extern "C" {
         fn cove_shell_services_install(callback: extern "C" fn(*const c_char, *const *const c_char, usize) -> *const c_char) -> bool;
         fn cove_shell_wake();
+        fn cove_shell_services_yield();
+        fn cove_shell_services_reveal(path: *const c_char);
+    }
+
+    pub(super) fn yield_app() {
+        // SAFETY: no arguments, and the hide is marshalled to the main queue.
+        unsafe { cove_shell_services_yield() }
+    }
+
+    pub(super) fn reveal_path(path: *const c_char) {
+        // SAFETY: the callee copies the string before returning.
+        unsafe { cove_shell_services_reveal(path) }
     }
 
     // The message AppKit shows for the current activation. The native side

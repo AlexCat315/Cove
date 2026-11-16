@@ -32,6 +32,8 @@ Cove 0.3.0 将 SDK 迁移到 Rust 2024，使用 Cargo 构建和管理依赖。
 ### 开发记录
 
 - **外壳动词安装器接入（2026-11-16）**：新增无原生依赖的 `cove-shell-verbs`，把动词描述符、`windows_verb_entries` 键计划与 Linux action 文件生成收为运行时与安装器共用的一份定义；`cove_shell::services` 改为重导出，API 不变，并新增可配置的 `windows_verb_entries_with(..., MultiSelectModel)` 与 `windows_verb_key` / `validate_id`。`cove-package` 新增 `install-shell-verbs` / `uninstall-shell-verbs`：Windows 经 `reg.exe` 按计划写入值、递归删键并触发 `SHChangeNotify(SHCNE_ASSOCCHANGED)`；Linux 安装 Nautilus scripts（`NAUTILUS_SCRIPT_SELECTED_FILE_PATHS`，带可执行位）与 Dolphin service menus（`%F`、MIME 过滤）到 XDG data home，卸载幂等。两命令支持 `--dry-run`、`--target`（四类 + 扩展名）、`--scope`、`--multi-select`、`--data-home`。结构化测试覆盖键/文件内容、安装与卸载计划一致、实际文件写入删除与非法 id 拒绝；菜单真实可见性仍按文档列为原生验收项。文档同步更新职责分层、安装命令与待办勾选。
+- 就地解压动词（2026-11-16）：`NSServices` 增加「解压到此处」「解压到同名文件夹」，handler 走 `mugenzip_core::open_archive` + `extract_entries`，不打开归档；服务激活后 `yield_to_background`（`NSApp hide:` 投主队列）把应用交还前台，完成后 `reveal`（`NSWorkspace selectFile:`）定位结果。实测两条动词都产出正确目录，前台回到调用前的应用。
+- 菜单栏常驻（2026-11-16）：壳层 `crates/shell/src/status_item.rs` + `apple.m` 的 `NSStatusItem`，`install(symbol, tooltip, entries, handler)`，空标题为分隔线，`quit` 由原生 terminate；点击先 `unhide`/`activate` 再回调，回调经队列回到 UI 线程（隐藏态不会 tick，必须靠恢复渲染消费队列）。
 
 - **外壳动词注册落地（2026-11-15）**：新增 `cove_shell::services`（经 `cove_ui::hosts::shell_services` 使用）。macOS 侧 `apple.m` 装了 `NSApp` 的 services provider，用 `-forwardInvocation:` 接住所有 `…:userData:error:` 选择器，从粘贴板按类读 `NSURL` 文件项，再派发到 Rust 的动词表；`install` 在构建 UI 的线程登记，provider 由平台主线程首个 tick 落装，服务到达时只把 `(verb, path…)` 入队并 `cove_shell_wake()`，handler 由 UI 线程经 `services::poll` 执行。选择器按 `NSMessage` 前缀匹配（AppKit 实际调用 `…:userData:error:`），未注册选择器或空选择把错误文本回填给 AppKit。已用打包产物 + `lsregister` + `NSPerformService` 验证：服务登记为 `service id`，投递到 handler。Windows 侧 `windows_verb_entries` 生成 `*` / `Directory` / `Directory\Background` / `SystemFileAssociations\.<ext>` 四类静态动词键（`MUIVerb`、`Icon`、`MultiSelectModel`、`command`），写入与卸载仍归安装器。Linux 尚无运行时发布路径。文档同步修正：`registerServicesMenuSendTypes:returnTypes:` 属消费服务一侧，发布侧只需 `NSServices` + `setServicesProvider:`；模板 `NSServices` 的 `NSSendTypes` 改为 `NSSendFileTypes`。
 
@@ -61,7 +63,6 @@ Cove 0.3.0 将 SDK 迁移到 Rust 2024，使用 Cargo 构建和管理依赖。
   - `cove-shell` 新增 SDL3 播放设备接口。`Sdl3AudioDevice::open_default(AudioStreamSpec)` 以 f32 规格打开默认播放流，打开时为暂停状态；`format()` 报告设备真实采样率、声道与 `AudioSampleFormat`（另给 `frame_bytes()` 便于按帧排队），`queued_bytes()` / `available_bytes()` 供节奏控制，`put` / `flush` / `pause` / `resume` 驱动播放，`Drop` 关闭流。SDL 音频子系统惰性初始化，可为多个流复用。
   - `cove-media` 新增 FFmpeg 命令行工具解析层。`FfmpegTools::discover()` 按 `COVE_FFMPEG_EXECUTABLE`/`COVE_FFPROBE_EXECUTABLE` → `COVE_FFMPEG_DIR` → `ffmpeg-tools` 构建出的目录 → `PATH` 的顺序解析，校验目标存在且可执行，并提供 `ffmpeg()`/`ffprobe()`、`version()`/`probe_version()`；失败时 `ToolError` 列出尝试过的路径，而不是等到播放时才暴露 spawn 失败。新增 `ffmpeg-tools` 特性会以 `ffmpeg-sys-next` 固定的 `release/9.0` 一并构建 `ffmpeg`、`ffprobe`（vendored 版本新增 `build-programs`，默认仍不产可执行文件）。
   - `cove-package` 支持 helper 可执行文件与额外资源。`[package.metadata.cove]` 新增 `helpers = ["bin-name"]` 与 `resources = ["相对路径"]`；macOS 把 helper 放进 `Contents/MacOS`、资源复制到 `Contents/Resources`，Windows/Linux 放进可执行文件旁并保留声明的相对路径。helper 在签署 bundle 之前逐个用同一身份签名，避免嵌套代码让 `codesign` 校验失败。iOS 与 Android 对 helpers 明确报错——两者的应用都无法 `exec` 捆绑的可执行文件，iOS 上的僵尸 helper 还会破坏签名校验——但资源仍照常复制（iOS 到 app 根，Android 到 assets）。
-
 
 - 修复 DevTools 的跨平台 MCP 启动及 Windows、Linux 的 CPU Profile 入口。Windows 可从可执行文件旁边的匹配 PDB 解析函数和源码位置，Web 阶段计时在停止后保留实际帧数。
 
@@ -489,7 +490,6 @@ Cove 0.3.0 将 SDK 迁移到 Rust 2024，使用 Cargo 构建和管理依赖。
   - `PlacementExample` 每个放置方向一个真实 `Popover` 触发器；懒加载网格、Masonry 样例和 `Divider` 接入 Layout 页。
   - TimePicker 的 "Now" 读取系统时钟，WheelPicker 补上 Reset 与已提交值读数；侧栏示例重新绑定草稿输入框；TextField 页删除被丢弃的重复控件。
 
-
 - **Compose 组件 API（破坏性）**。应用可导入 `cove_ui::prelude::*`，组件在所属分组中显式导出。使用旧实现模块路径的代码请改从分组导入。
   - `DatePicker`、`DateRangePicker` 和 `CalendarView` 通过 `new(binding)` 直接读写选中日期。`Image` 的构造器接收逻辑尺寸 `Size`，颜色和渲染模式通过 builder 设置。
   - `Spinner::new()`、`Divider::new()` 和 `ZStack::new(content)` 采用默认外观。`Sheet`、`BottomSheet`、`Dialog`、`Tooltip` 使用 `configure` 增量修改选项。
@@ -754,8 +754,6 @@ Cove 0.3.0 将 SDK 迁移到 Rust 2024，使用 Cargo 构建和管理依赖。
     src/C/Cargo 目标和目录；验证记录见 `Docs/rust-migration-validation.md`。
   - 浏览器构建、调试配置与 CI 改用 Cargo；浏览器 JS 按 Rust 分配器 ABI 传入释放长度。
     移除依赖旧 Swift CLI 的浏览器命令及外部 Diffuse 的 Swift shader-sdk CI 作业。
-
-
 
 - **新增 `cove-agent`（`Agent/`），agent/MCP 层脱离 UI 栈**：
   - `cove-devtools` 的 `agent/`、`agent_transport.rs` 与 `inspection/tools.rs` 移入，只依赖 serde；

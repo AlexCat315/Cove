@@ -164,6 +164,69 @@ bool cove_shell_services_install(CoveShellServiceCallback callback){COVE_ASSERT_
     });
     return YES;
 }
+void cove_shell_services_yield(void){
+    dispatch_async(dispatch_get_main_queue(),^{
+        [NSApplication sharedApplication];
+        [NSApp hide:nil];
+    });
+}
+void cove_shell_services_reveal(const char *path){
+    if(!path)return;
+    NSString *target=[NSString stringWithUTF8String:path];
+    dispatch_async(dispatch_get_main_queue(),^{
+        [[NSWorkspace sharedWorkspace] selectFile:target inFileViewerRootedAtPath:@""];
+    });
+}
+
+/* ===== Menu-bar extra ===== */
+static CoveStatusItemCallback statusItemCallback=NULL;
+static NSStatusItem *statusItem=nil;
+
+@interface CoveStatusItemTarget : NSObject
+@end
+@implementation CoveStatusItemTarget
+-(void)activate:(NSMenuItem*)item{
+    /* The menu bar is reachable while the app is hidden, and a hidden app stops
+       ticking the UI thread; bring it back so the queued pick can be delivered. */
+    [NSApp unhide:nil];
+    [NSApp activateIgnoringOtherApps:YES];
+    if(statusItemCallback)statusItemCallback((size_t)item.tag);
+}
+-(void)quit:(NSMenuItem*)item{
+    (void)item;
+    [NSApp terminate:nil];
+}
+@end
+
+bool cove_shell_status_item_install(const char *symbol,const char *tooltip,const char *const *titles,const char *const *ids,size_t count,CoveStatusItemCallback callback){COVE_ASSERT_MAIN();
+    if(!callback)return false;
+    statusItemCallback=callback;
+    static CoveStatusItemTarget *target=nil;
+    static dispatch_once_t once;
+    dispatch_once(&once,^{
+        [NSApplication sharedApplication];
+        statusItem=[[NSStatusBar systemStatusBar] statusItemWithLength:NSVariableStatusItemLength];
+        target=[CoveStatusItemTarget new];
+    });
+    NSImage *image=symbol?[NSImage imageWithSystemSymbolName:[NSString stringWithUTF8String:symbol] accessibilityDescription:nil]:nil;
+    image.template=YES;
+    statusItem.button.image=image;
+    statusItem.button.title=image?@"":@"MZ";
+    statusItem.button.toolTip=tooltip?[NSString stringWithUTF8String:tooltip]:nil;
+    NSMenu *menu=[NSMenu new];
+    for(size_t i=0;i<count;i++){
+        NSString *title=titles[i]?[NSString stringWithUTF8String:titles[i]]:@"";
+        if(title.length==0){[menu addItem:[NSMenuItem separatorItem]];continue;}
+        NSString *identifier=ids&&ids[i]?[NSString stringWithUTF8String:ids[i]]:@"";
+        BOOL quits=[identifier isEqualToString:@"quit"];
+        NSMenuItem *item=[[NSMenuItem alloc] initWithTitle:title action:(quits?@selector(quit:):@selector(activate:)) keyEquivalent:@""];
+        item.target=target;
+        item.tag=(NSInteger)i;
+        [menu addItem:item];
+    }
+    statusItem.menu=menu;
+    return YES;
+}
 #else
 /* SDL's UIKit delegates forward openURL as a drag; divert handleURL: into the
    open-documents inbox so an OS open is not mistaken for a drop on a window. */

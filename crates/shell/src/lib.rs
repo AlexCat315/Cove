@@ -14,6 +14,7 @@ mod open_documents;
 mod platform_shell;
 pub mod scroll;
 pub mod services;
+pub mod status_item;
 mod sdl3_audio;
 mod sdl3_clipboard;
 mod sdl3_shell;

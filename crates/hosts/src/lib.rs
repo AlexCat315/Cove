@@ -20,6 +20,7 @@ pub use desktop::application::configuration::{ApplicationConfiguration, TitleBar
 #[cfg(not(target_arch = "wasm32"))]
 pub use desktop::application::runtime::{Application, ApplicationCallbacks};
 pub use cove_shell::services as shell_services;
+pub use cove_shell::status_item as status_item;
 pub use desktop::window::{
     NativeMenu, NativeMenuAction, NativeMenuBar, NativeMenuItem, NativeMenuKeyModifiers,
 };

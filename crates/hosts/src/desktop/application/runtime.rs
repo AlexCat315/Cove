@@ -1069,6 +1069,7 @@ impl Application {
         /* Services the OS delivered while this thread was busy: the provider
            enqueues on the main thread, the handler must run here. */
         cove_shell::services::poll();
+        cove_shell::status_item::poll();
         let documents = self.state.host.take_open_documents();
         if !documents.is_empty() {
             cove_core::scene::OpenedDocuments::deliver(documents);
