@@ -371,6 +371,9 @@ impl TextCompletionSession {
         if let Some(handler) = field.events.on_change.as_ref() {
             handler(&applied.buffer);
         }
+        if let Some(handler) = field.events.on_caret_change.as_ref() {
+            handler(super::text_field_editing::caret_state(&state.borrow()));
+        }
         if let Some(handler) = field.code_editing.on_accept_completion.as_ref() {
             handler(item);
         }

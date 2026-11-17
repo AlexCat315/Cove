@@ -53,13 +53,14 @@ use super::text_field_navigation::{
 };
 use super::text_field_observation::{TextFieldCaretState, TextFieldHoverAnchor};
 use super::text_field_options::{
-    TextFieldAxis, TextFieldBehavior, TextFieldCodeEditing, TextFieldDecoration, TextFieldLayout,
-    TextFieldNavigationRequest, TextFieldSize,
+    TextFieldAxis, TextFieldBehavior, TextFieldCodeEditing, TextFieldDecoration,
+    TextFieldEditRequest, TextFieldLayout, TextFieldNavigationRequest, TextFieldSize,
 };
 
 const SCROLLBAR_HOVERED: &str = "__textfield_scrollbar_hovered";
 const FOCUS_REQUEST_ID: &str = "__textfield_focus_request_id";
 const CARET_REQUEST_ID: &str = "__textfield_caret_request_id";
+const EDIT_REQUEST_ID: &str = "__textfield_edit_request_id";
 const MINIMAP_GEOMETRY: &str = "__textfield_minimap_geometry";
 const MINIMAP_DRAGGING: &str = "__textfield_minimap_dragging";
 const MEASURE_INPUTS_KEY: &str = "__textfield_measure_inputs";
@@ -453,6 +454,8 @@ pub struct TextField {
     pub decoration: TextFieldDecoration,
     pub code_editing: TextFieldCodeEditing,
     pub navigation: TextFieldNavigationRequest,
+    /// One-shot programmatic edit, applied with undo history intact.
+    pub edit_request: Option<TextFieldEditRequest>,
     pub events: TextFieldEvents,
     pub style: Option<AnyTextFieldStyle>,
     /// The surface's touch target for a single-line field; zero elsewhere.
@@ -470,6 +473,7 @@ impl TextField {
             decoration: TextFieldDecoration::default(),
             code_editing: TextFieldCodeEditing::default(),
             navigation: TextFieldNavigationRequest::default(),
+            edit_request: None,
             events: TextFieldEvents::default(),
             style: None,
             touch_minimum: 0.0,
@@ -772,6 +776,7 @@ impl TextField {
             decoration: self.decoration.clone(),
             code_editing: self.code_editing.clone(),
             navigation: self.navigation.clone(),
+            edit_request: self.edit_request.clone(),
             events: self.events.clone(),
             style: self.style.clone(),
             touch_minimum: self.touch_minimum,
@@ -928,6 +933,43 @@ impl PrimitiveView for TextFieldHost {
             ..Default::default()
         }));
 
+        // Programmatic edits join the undo history instead of resetting it the
+        // way a rewrite of the bound text does.
+        if let Some(request) = self.field.edit_request.clone()
+            && node.attachment::<u64>(EDIT_REQUEST_ID) != Some(request.id)
+        {
+            node.set_attachment(EDIT_REQUEST_ID, request.id);
+            {
+                let mut state = state_handle.borrow_mut();
+                state.begin_edit(&current, TextEditKind::Atomic);
+                let count = state.buffer.character_count();
+                let low = request.range.start.min(count);
+                let high = request.range.end.min(count).max(low);
+                state.buffer = state.buffer.replace(low..high, &request.replacement);
+                let count = state.buffer.character_count();
+                let cursor = request.caret.min(count);
+                state.selection.cursor_index = cursor;
+                state.selection.anchor = request
+                    .anchor
+                    .map(|anchor| anchor.min(count))
+                    .filter(|&anchor| anchor != cursor);
+                state.selection.set_preferred_caret_x(None);
+                state.record_activity();
+                state.end_edit();
+            }
+            let buffer = state_handle.borrow().buffer.clone();
+            self.field.text.set(buffer.clone());
+            if let Some(handler) = node.attachment::<Rc<dyn Fn(&TextBuffer)>>("__textfield_change")
+            {
+                handler(&buffer);
+            }
+            notify_caret(node, &state_handle);
+            node.mark_render_dirty(cove_core::scene::InvalidationSource::style_set(
+                "textFieldEditRequest",
+            ));
+        }
+        let current = self.field.text.get();
+
         // Focus requests arrive as one-shot IDs so repeated updates cannot
         // re-focus a field the user already left.
         if let Some(request) = self.field.navigation.focus_request_id
@@ -942,6 +984,8 @@ impl PrimitiveView for TextFieldHost {
             state.selection.anchor = Some(0);
             state.selection.cursor_index = state.buffer.character_count();
             state.record_activity();
+            drop(state);
+            notify_caret(node, &state_handle);
         }
         if let (Some(request), Some(index)) = (
             self.field.navigation.caret_request_id,
@@ -954,12 +998,20 @@ impl PrimitiveView for TextFieldHost {
                 let mut state = handle.borrow_mut();
                 state.selection.anchor = None;
                 state.move_cursor(index, false, None);
+                let count = state.buffer.character_count();
+                state.selection.anchor = self
+                    .field
+                    .navigation
+                    .caret_request_anchor
+                    .map(|anchor| anchor.min(count))
+                    .filter(|&anchor| anchor != state.selection.cursor_index);
             }
             // A caret request also focuses the field, so the host can place the
             // IME anchor on the requested caret.
             if let Some(chain) = FocusChainHolder::current() {
                 chain.focus(Some(node), false);
             }
+            notify_caret(node, &state_handle);
         }
 
         if let Some(session) = node.first_resource::<TextCompletionSession>() {
@@ -1400,6 +1452,7 @@ fn restore_history(
             handler(&buffer);
         }
     }
+    notify_caret(node, state);
     node.mark_render_dirty(cove_core::scene::InvalidationSource::style_set(
         "textFieldUndo",
     ));

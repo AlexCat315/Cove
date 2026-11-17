@@ -313,6 +313,7 @@ fn completion_field(
         focus_request_id: None,
         caret_request_id: Some(1),
         caret_request_index: Some(caret),
+        ..TextFieldNavigationRequest::default()
     };
     scene.install(field.frame_size(500.0, 40.0));
     (buffer, requests)

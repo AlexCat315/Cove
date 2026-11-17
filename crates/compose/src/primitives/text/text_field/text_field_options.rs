@@ -145,12 +145,30 @@ pub struct TextFieldNavigationRequest {
     pub focus_request_id: Option<u64>,
     pub caret_request_id: Option<u64>,
     pub caret_request_index: Option<usize>,
+    /// Selection anchor for the caret request; the caret sits at the other
+    /// end. `None` (or equal to the index) leaves a plain caret.
+    pub caret_request_anchor: Option<usize>,
 }
 
 impl TextFieldNavigationRequest {
     pub fn new() -> Self {
         Self::default()
     }
+}
+
+/// A one-shot programmatic edit. Unlike rewriting the bound text, the request
+/// is applied inside the field's undo bracket, so the step can be undone and
+/// the caret/selection land where the caller asks.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct TextFieldEditRequest {
+    /// Monotonic id; a request applies once per id.
+    pub id: u64,
+    /// Character range to replace.
+    pub range: std::ops::Range<usize>,
+    pub replacement: String,
+    pub caret: usize,
+    /// Selection anchor; `None` leaves a plain caret at `caret`.
+    pub anchor: Option<usize>,
 }
 
 /// Code-editing payload carried alongside a plain text field.

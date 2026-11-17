@@ -42,7 +42,8 @@ use cove_ui_compose::primitives::text::text_field::text_field_layout_engine::{
     FieldLayoutInputs, document_geometry,
 };
 use cove_ui_compose::primitives::text::text_field::text_field_options::{
-    TextFieldAxis, TextFieldBehavior, TextFieldLayout, TextFieldNavigationRequest,
+    TextFieldAxis, TextFieldBehavior, TextFieldEditRequest, TextFieldLayout,
+    TextFieldNavigationRequest,
 };
 use cove_ui_compose::theme::{SemanticFontRef, theme_for_node};
 
@@ -497,6 +498,74 @@ fn page_navigation() {
         assert!(
             document.is_some(),
             "the draw publishes the shaped document layout"
+        );
+    });
+}
+
+#[test]
+fn caret_change_publishes_caret_and_selection() {
+    with_scene(Some(test_text_environment(16.0, 20.0)), |scene| {
+        let seen = Rc::new(RefCell::new(Vec::new()));
+        let sink = seen.clone();
+        let store = Arc::new(Mutex::new(TextBuffer::new("hello world")));
+        let mut field = TextField::new("", store_binding(&store));
+        field.events.on_caret_change = Some(Rc::new(move |state| sink.borrow_mut().push(state)));
+        field.navigation = TextFieldNavigationRequest {
+            caret_request_id: Some(1),
+            caret_request_index: Some(5),
+            caret_request_anchor: Some(0),
+            ..TextFieldNavigationRequest::default()
+        };
+        scene
+            .graph
+            .install(field.frame_size(300.0, 60.0), Default::default());
+        scene.graph.compute_layout(300.0, 60.0);
+        scene.graph.compute_layout(300.0, 60.0);
+        let node = field_node(&scene.graph);
+        let state = state_of(&node).unwrap();
+        assert_eq!(state.borrow().selection_range(), Some((0, 5)));
+        let handler = scene.registry.handlers(&node).key.expect("key handler");
+        press(&handler, Scancode::RIGHT, KeyModifiers::LEFT_SHIFT);
+        assert_eq!(seen.borrow().last().unwrap().selected_range, Some((0, 6)));
+        press(&handler, Scancode::RIGHT, KeyModifiers::default());
+        let last = seen.borrow().last().unwrap();
+        assert_eq!(last.selected_range, None);
+        assert_eq!(last.caret_index, 6);
+        press(&handler, Scancode::BACKSPACE, KeyModifiers::default());
+        let last = seen.borrow().last().unwrap();
+        assert_eq!(last.caret_index, 5);
+        assert_eq!(last.selected_range, None);
+    });
+}
+
+#[test]
+fn edit_request_applies_once_and_is_undoable() {
+    with_scene(Some(test_text_environment(16.0, 20.0)), |scene| {
+        let store = Arc::new(Mutex::new(TextBuffer::new("hello world")));
+        let mut field = TextField::new("", store_binding(&store));
+        field.edit_request = Some(TextFieldEditRequest {
+            id: 1,
+            range: 0..5,
+            replacement: "HI".to_owned(),
+            caret: 2,
+            anchor: Some(0),
+        });
+        scene
+            .graph
+            .install(field.frame_size(300.0, 60.0), Default::default());
+        scene.graph.compute_layout(300.0, 60.0);
+        scene.graph.compute_layout(300.0, 60.0);
+        assert_eq!(store.lock().unwrap().string_value(), "HI world");
+        let node = field_node(&scene.graph);
+        let state = state_of(&node).unwrap();
+        assert_eq!(state.borrow().selection.cursor_index, 2);
+        assert_eq!(state.borrow().selection.anchor, Some(0));
+        let handler = scene.registry.handlers(&node).key.expect("key handler");
+        press(&handler, Scancode::Z, KeyModifiers::LEFT_CTRL);
+        assert_eq!(
+            store.lock().unwrap().string_value(),
+            "hello world",
+            "the request joined the undo history"
         );
     });
 }

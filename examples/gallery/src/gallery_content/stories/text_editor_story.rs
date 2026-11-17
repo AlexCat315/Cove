@@ -472,6 +472,7 @@ impl TextEditorStory {
             focus_request_id: Some(request),
             caret_request_id: Some(request),
             caret_request_index: Some(index),
+            ..TextFieldNavigationRequest::default()
         });
         self.status.set(format!(
             "{count} lines · caret at line {} · type, scroll, undo and redo",
@@ -528,6 +529,7 @@ impl View for TextEditorStory {
                 focus_request_id: Some(id),
                 caret_request_id: Some(id),
                 caret_request_index: Some(0),
+                ..TextFieldNavigationRequest::default()
             });
         })
         .enabled(enabled);
@@ -554,6 +556,7 @@ impl View for TextEditorStory {
                 focus_request_id: None,
                 caret_request_id: Some(id),
                 caret_request_index: Some(index),
+                ..TextFieldNavigationRequest::default()
             });
             status
                 .set("200,000 lines · caret at line 100,001 · type, scroll, undo and redo".into());
@@ -607,6 +610,7 @@ impl View for TextEditorStory {
                         focus_request_id: None,
                         caret_request_id: Some(id),
                         caret_request_index: Some(0),
+                        ..TextFieldNavigationRequest::default()
                     });
                 },
             ));
