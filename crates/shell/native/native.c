@@ -429,7 +429,13 @@ void cove_shell_chrome(CoveShellWindow *h,const CoveShellChrome *chrome){ COVE_A
     cove_shell_apple_chrome(h->apple,&h->chrome);
 #endif
 }
-void cove_shell_text_area(CoveShellWindow *h,const float *area){ COVE_ASSERT_MAIN();if(!h)return;if(!area){SDL_SetTextInputArea(h->window,NULL,0);SDL_StopTextInput(h->window);return;}SDL_Rect r={(int)fmaxf(0,floorf(area[0])),(int)fmaxf(0,floorf(area[1])),(int)fmaxf(1,ceilf(area[2])),(int)fmaxf(1,ceilf(area[3]))};if(!SDL_TextInputActive(h->window))SDL_StartTextInput(h->window);SDL_SetTextInputArea(h->window,&r,(int)fmaxf(0,roundf(area[4])));}
+void cove_shell_text_area(CoveShellWindow *h,const float *area){ COVE_ASSERT_MAIN();if(!h)return;if(!area){SDL_SetTextInputArea(h->window,NULL,0);SDL_StopTextInput(h->window);return;}
+    /* Cove lays out in logical points. Windows SDL reports and accepts text
+       input rectangles in physical client pixels, so an unconverted area puts
+       the IME composition string and candidate window at 1/scale of the caret
+       on a 150%/200% display. macOS and Linux report scale 1.0 here. */
+    const float scale=coordinate_scale(SDL_GetWindowID(h->window));
+    SDL_Rect r={(int)fmaxf(0,floorf(area[0]*scale)),(int)fmaxf(0,floorf(area[1]*scale)),(int)fmaxf(1,ceilf(area[2]*scale)),(int)fmaxf(1,ceilf(area[3]*scale))};if(!SDL_TextInputActive(h->window))SDL_StartTextInput(h->window);SDL_SetTextInputArea(h->window,&r,(int)fmaxf(0,roundf(area[4]*scale)));}
 void cove_shell_keyboard(CoveShellWindow *h,bool show){ COVE_ASSERT_MAIN();if(!h)return;if(show){if(!SDL_TextInputActive(h->window))SDL_StartTextInput(h->window);}else SDL_StopTextInput(h->window);}
 float cove_shell_keyboard_height(void){
 #if defined(__APPLE__)
