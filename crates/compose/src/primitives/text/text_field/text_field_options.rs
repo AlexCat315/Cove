@@ -140,7 +140,7 @@ impl TextFieldContentPadding {
 }
 
 /// One-shot navigation requests, separate from the live caret/selection state.
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct TextFieldNavigationRequest {
     pub focus_request_id: Option<u64>,
     pub caret_request_id: Option<u64>,
@@ -148,6 +148,21 @@ pub struct TextFieldNavigationRequest {
     /// Selection anchor for the caret request; the caret sits at the other
     /// end. `None` (or equal to the index) leaves a plain caret.
     pub caret_request_anchor: Option<usize>,
+    /// Whether the caret request also focuses the field. Find-style navigation
+    /// moves the caret and selection while another field keeps the keyboard.
+    pub caret_request_focus: bool,
+}
+
+impl Default for TextFieldNavigationRequest {
+    fn default() -> Self {
+        Self {
+            focus_request_id: None,
+            caret_request_id: None,
+            caret_request_index: None,
+            caret_request_anchor: None,
+            caret_request_focus: true,
+        }
+    }
 }
 
 impl TextFieldNavigationRequest {
@@ -212,6 +227,33 @@ impl TextFieldCodeEditing {
     pub fn validated(mut self) -> Self {
         self.validate();
         self
+    }
+
+    /// Comparable projection of the settings the surface paints, for the draw
+    /// identity. Closures cannot be compared, so a highlighter whose output
+    /// changes without its presence changing must bump `syntax_revision`.
+    pub(crate) fn draw_identity(
+        &self,
+    ) -> (
+        Vec<std::ops::Range<usize>>,
+        bool,
+        Option<u64>,
+        bool,
+        bool,
+        Option<usize>,
+        Option<Color>,
+        Option<Color>,
+    ) {
+        (
+            self.occurrences.clone(),
+            self.syntax_color_at_utf8_offset.is_some(),
+            self.syntax_revision,
+            self.shows_line_numbers,
+            self.shows_minimap,
+            self.indentation_width,
+            self.line_number_color,
+            self.line_number_gutter_color,
+        )
     }
 }
 

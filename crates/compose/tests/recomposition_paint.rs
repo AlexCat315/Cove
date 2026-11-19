@@ -11,9 +11,12 @@ use cove_composition::Scope;
 use std::cell::Cell;
 use std::rc::Rc;
 
-use cove_core::scene::{LayerAwareNodeRenderer, LayoutNode, Node};
-use cove_core::{Color, DrawList, Rect, State};
+use cove_core::scene::{AccessibilityRole, LayerAwareNodeRenderer, LayoutNode, Node};
+use cove_core::{Binding, Color, DrawList, Rect, State};
 use cove_ui_compose::modifiers::layout::{FrameDimension, LayoutFrameExt};
+use cove_ui_compose::primitives::text::text_buffer::TextBuffer;
+use cove_ui_compose::primitives::text::text_field::text_field::TextField;
+use cove_ui_compose::primitives::text::text_field::text_field_options::TextFieldCodeEditing;
 use cove_ui_compose::{AnyView, PrimitiveView};
 
 use support::{GlobalTestLock, with_test_text_environment};
@@ -156,6 +159,101 @@ fn unchanged_output_reuses_geometry_with_diagnostics_enabled() {
             graph.recomposer.commit_all();
             renderer.render(graph.render_tree(), &mut list);
             assert!(counter.get() > paints, "the new draw identity repaints");
+        });
+    });
+}
+
+/// A text field whose code-editing payload comes from observed state, the way
+/// a find bar feeds match ranges and a settings toggle feeds the highlighter.
+#[derive(Clone)]
+struct CodeFieldHarness {
+    occurrences: State<Vec<std::ops::Range<usize>>>,
+    syntax: State<bool>,
+}
+
+impl cove_composition::View for CodeFieldHarness {
+    fn body(&self, _cx: &Scope) -> AnyView {
+        let mut code = TextFieldCodeEditing {
+            occurrences: self.occurrences.get(),
+            ..Default::default()
+        };
+        if self.syntax.get() {
+            code.syntax_color_at_utf8_offset = Some(Rc::new(|_, _| Some(Color::WHITE)));
+        }
+        AnyView::new(
+            TextField::new("", Binding::constant(TextBuffer::new("alpha beta")))
+                .code_editing(code)
+                .frame_size(200.0, 60.0),
+        )
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        vec![
+            cove_composition::DynamicField::state("occurrences", &self.occurrences),
+            cove_composition::DynamicField::state("syntax", &self.syntax),
+        ]
+    }
+}
+
+fn field_node(graph: &Rc<cove_composition::ViewGraph>) -> Node {
+    fn walk(node: &Node, into: &mut Vec<Node>) {
+        into.push(node.clone());
+        for child in node.children() {
+            walk(&child, into);
+        }
+    }
+    let mut nodes = Vec::new();
+    walk(&graph.tree.borrow().root().expect("root"), &mut nodes);
+    nodes
+        .into_iter()
+        .find(|node| {
+            node.accessibility()
+                .is_some_and(|semantics| semantics.role == AccessibilityRole::TextField)
+        })
+        .expect("the mounted field")
+}
+
+#[test]
+fn code_editing_changes_repaint_the_field_surface() {
+    GlobalTestLock::locked(|| {
+        with_test_text_environment(|| {
+            let occurrences = State::new(vec![0usize..2]);
+            let syntax = State::new(true);
+            let graph = support::graph();
+            graph.install_view(
+                AnyView::new(CodeFieldHarness {
+                    occurrences: occurrences.clone(),
+                    syntax: syntax.clone(),
+                }),
+                Default::default(),
+            );
+            graph.compute_layout(200.0, 60.0);
+            let field = field_node(&graph);
+
+            let mut renderer = LayerAwareNodeRenderer::new();
+            let mut list = DrawList::default();
+            renderer.render(graph.render_tree(), &mut list);
+            graph.tree.borrow_mut().flush();
+            let epoch = field.repaint_epoch();
+
+            // Clearing the matches changes nothing the old identity watched:
+            // text, placeholder, layout, behavior and focus all stay put.
+            occurrences.set(Vec::new());
+            graph.recomposer.commit_all();
+            renderer.render(graph.render_tree(), &mut list);
+            assert!(
+                field.repaint_epoch() > epoch,
+                "clearing occurrence washes repaints the surface"
+            );
+            let epoch = field.repaint_epoch();
+
+            syntax.set(false);
+            graph.recomposer.commit_all();
+            renderer.render(graph.render_tree(), &mut list);
+            assert!(
+                field.repaint_epoch() > epoch,
+                "turning the syntax highlighter off repaints the surface"
+            );
         });
     });
 }

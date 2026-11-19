@@ -4,6 +4,13 @@
 
 ## Unreleased
 
+- 修复 `TextField` 的 `on_caret_change` 死回调：附件只写不读，回调从不触发。现在输入、粘贴、指针选择、撤销 / 重做、导航与编辑请求等所有提交点都发布光标与选区。
+- 新增 `TextFieldEditRequest`：程序化替换在字段自身的撤销括号内应用，外部改写绑定文本不再清空撤销 / 重做栈；请求带光标与选区锚点落点。
+- `TextFieldNavigationRequest` 新增 `caret_request_anchor`（导航带选区）与 `caret_request_focus`（默认 true；置 false 时只移光标不抢焦点，供查找栏一类保持键盘的外壳使用）。
+- `TextFieldCodeEditing::occurrences` 此前只存不画：现在在字形与选区带之下按可见行绘制匹配淡色底纹。
+- 修复普通左右方向键在有选区时越过选区边缘多移一格：现在与平台文本视图一致，先折叠到选区边缘。
+- 修复 `TextField` 画布身份缺口：`update_draw` 的身份只含文本 / 占位符 / 布局 / 行为 / 焦点，重算后仅 `code_editing`（匹配底纹、高亮开关、行号与缩进设置）或 `decoration` 变化时不重绘，留下过期底纹与字色。身份现在纳入装饰与 `TextFieldCodeEditing::draw_identity()`；闭包输出变化用此前闲置的 `syntax_revision` 声明。
+
 ## 0.3.0 — 2026-11-15
 
 Cove 0.3.0 将 SDK 迁移到 Rust 2024，使用 Cargo 构建和管理依赖。

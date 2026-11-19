@@ -1007,8 +1007,11 @@ impl PrimitiveView for TextFieldHost {
                     .filter(|&anchor| anchor != state.selection.cursor_index);
             }
             // A caret request also focuses the field, so the host can place the
-            // IME anchor on the requested caret.
-            if let Some(chain) = FocusChainHolder::current() {
+            // IME anchor on the requested caret — unless the caller asked for a
+            // focus-free move (find bars keep the keyboard in their own field).
+            if self.field.navigation.caret_request_focus
+                && let Some(chain) = FocusChainHolder::current()
+            {
                 chain.focus(Some(node), false);
             }
             notify_caret(node, &state_handle);
@@ -1058,6 +1061,8 @@ impl PrimitiveView for TextFieldHost {
                 self.field.layout,
                 self.field.behavior.clone(),
                 is_focused,
+                self.field.decoration.clone(),
+                self.field.code_editing.draw_identity(),
             ),
             move |list, origin| {
                 let Some(owner) = Node::upgrade(&draw_node) else {
@@ -2649,9 +2654,17 @@ fn apply_key(
                     word_boundary_before(&state.buffer, caret)
                 }
             } else if forward {
-                grapheme_after(&state.buffer, caret)
+                // A plain arrow collapses an active selection to its edge
+                // instead of stepping past it, matching platform text views.
+                match state.selection_range() {
+                    Some((_, high)) if !shift => high,
+                    _ => grapheme_after(&state.buffer, caret),
+                }
             } else {
-                grapheme_before(&state.buffer, caret)
+                match state.selection_range() {
+                    Some((low, _)) if !shift => low,
+                    _ => grapheme_before(&state.buffer, caret),
+                }
             };
             state.move_cursor(target, shift, None);
             EventResult::Handled
@@ -3194,6 +3207,21 @@ fn render(
                 theme.colors.divider.multiplied_alpha(0.6),
             );
         }
+    }
+
+    // Occurrence washes (find matches, repeated symbols) under the glyphs and
+    // under the selection band, so the active match still reads as selected.
+    if !field.code_editing.occurrences.is_empty() && !render_state.shows_placeholder {
+        crate::primitives::text::code::draw_occurrences(
+            list,
+            &layout,
+            &field.code_editing.occurrences,
+            text_origin.x,
+            text_origin.y,
+            line_height,
+            theme.colors.accent,
+            node.opacity(),
+        );
     }
 
     // Selection band under the glyphs.

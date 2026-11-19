@@ -25,7 +25,7 @@ use std::rc::Rc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
-use cove_composition::ViewGraph;
+use cove_composition::{AnyView, TupleView, ViewGraph};
 use cove_core::scene::{
     EventPhase, FocusChain, FocusChainHolder, InteractionRegistry, InteractionRegistryHolder,
     KeyHandler, Node, TextInputAttachmentKey,
@@ -525,14 +525,14 @@ fn caret_change_publishes_caret_and_selection() {
         let state = state_of(&node).unwrap();
         assert_eq!(state.borrow().selection_range(), Some((0, 5)));
         let handler = scene.registry.handlers(&node).key.expect("key handler");
-        press(&handler, Scancode::RIGHT, KeyModifiers::LEFT_SHIFT);
+        press(&handler, Scancode::ARROW_RIGHT, KeyModifiers::LEFT_SHIFT);
         assert_eq!(seen.borrow().last().unwrap().selected_range, Some((0, 6)));
-        press(&handler, Scancode::RIGHT, KeyModifiers::default());
-        let last = seen.borrow().last().unwrap();
+        press(&handler, Scancode::ARROW_RIGHT, KeyModifiers::default());
+        let last = seen.borrow().last().unwrap().clone();
         assert_eq!(last.selected_range, None);
         assert_eq!(last.caret_index, 6);
         press(&handler, Scancode::BACKSPACE, KeyModifiers::default());
-        let last = seen.borrow().last().unwrap();
+        let last = seen.borrow().last().unwrap().clone();
         assert_eq!(last.caret_index, 5);
         assert_eq!(last.selected_range, None);
     });
@@ -566,6 +566,52 @@ fn edit_request_applies_once_and_is_undoable() {
             store.lock().unwrap().string_value(),
             "hello world",
             "the request joined the undo history"
+        );
+    });
+}
+
+#[test]
+fn focus_free_caret_request_keeps_the_keyboard_elsewhere() {
+    with_scene(Some(test_text_environment(16.0, 20.0)), |scene| {
+        let keeper = Arc::new(Mutex::new(TextBuffer::new("keeper")));
+        let mut first = TextField::new("", store_binding(&keeper));
+        first.navigation = TextFieldNavigationRequest {
+            focus_request_id: Some(1),
+            ..TextFieldNavigationRequest::default()
+        };
+        let mover = Arc::new(Mutex::new(TextBuffer::new("hello world")));
+        let mut second = TextField::new("", store_binding(&mover));
+        second.navigation = TextFieldNavigationRequest {
+            caret_request_id: Some(1),
+            caret_request_index: Some(5),
+            caret_request_anchor: Some(0),
+            caret_request_focus: false,
+            ..TextFieldNavigationRequest::default()
+        };
+        scene.graph.install(
+            TupleView::new(vec![
+                AnyView::new(first.frame_size(200.0, 40.0)),
+                AnyView::new(second.frame_size(200.0, 40.0)),
+            ]),
+            Default::default(),
+        );
+        scene.graph.compute_layout(400.0, 80.0);
+        scene.graph.compute_layout(400.0, 80.0);
+        let root = scene.graph.tree.borrow().root().expect("a mounted root");
+        let fields: Vec<Node> = nodes(&root)
+            .into_iter()
+            .filter(|node| state_of(node).is_some())
+            .collect();
+        assert_eq!(fields.len(), 2);
+        assert_eq!(
+            scene.focus.focused(),
+            Some(fields[0].clone()),
+            "the focus-free caret request left the keyboard with the first field"
+        );
+        assert_eq!(
+            state_of(&fields[1]).unwrap().borrow().selection_range(),
+            Some((0, 5)),
+            "the caret and selection still moved"
         );
     });
 }
