@@ -454,6 +454,8 @@ fn ime_preview_clamps_a_stale_search_caret_after_external_clearing() {
             horizontal_inset: 0.0,
             vertical_inset: 0.0,
             text_origin_y_offset: 0.0,
+            first_line_indent: 0.0,
+            first_line_indent_skip: Default::default(),
         },
         &mut draft,
         &TextBuffer::empty(),

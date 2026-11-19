@@ -1220,6 +1220,8 @@ fn secure_field_masks_and_blocks_copy() {
             horizontal_inset: 8.0,
             vertical_inset: 0.0,
             text_origin_y_offset: 0.0,
+            first_line_indent: 0.0,
+            first_line_indent_skip: Default::default(),
         };
         let mut draft = RenderDraftState::default();
         let render = make_render_state(

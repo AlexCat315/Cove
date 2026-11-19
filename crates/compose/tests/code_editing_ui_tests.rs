@@ -189,6 +189,8 @@ fn diagnostics_select_overlapping_rows_clusters_and_empty_positions() {
                 atlas: environment.atlas.identity(),
                 width: f32::INFINITY,
                 secure: false,
+                first_line_indent: 0.0,
+                first_line_indent_skip: Default::default(),
             };
             let mut document = TextDocumentLayout::new(buffer.clone(), geometry);
             let window = document.visible_layout(0, 3, &environment);

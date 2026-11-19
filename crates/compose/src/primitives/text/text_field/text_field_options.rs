@@ -22,6 +22,28 @@ pub enum TextFieldAxis {
     Vertical,
 }
 
+/// Optional per-line opt-out for the paragraph indent. The editor decides
+/// which lines are body paragraphs; everything else (chapter titles, a book
+/// title) stays flush.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct TextFieldIndentSkip(Option<fn(&str) -> bool>);
+
+impl TextFieldIndentSkip {
+    pub fn new(skip: fn(&str) -> bool) -> Self {
+        Self(Some(skip))
+    }
+
+    pub fn skips(&self, text: &str) -> bool {
+        self.0.is_some_and(|skip| skip(text))
+    }
+}
+
+impl PartialEq for TextFieldIndentSkip {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.is_none() && other.0.is_none()
+    }
+}
+
 /// Authored layout settings.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TextFieldLayout {
@@ -29,6 +51,11 @@ pub struct TextFieldLayout {
     pub max_visible_lines: usize,
     pub ideal_width: f32,
     pub wraps_lines: bool,
+    /// Paragraph indent applied to the first visual row of each wrapped line,
+    /// in points. Zero keeps the old flush-left layout.
+    pub first_line_indent: f32,
+    /// Lines this filter accepts stay flush, even with an indent configured.
+    pub first_line_indent_skip: TextFieldIndentSkip,
 }
 
 impl Default for TextFieldLayout {
@@ -38,6 +65,8 @@ impl Default for TextFieldLayout {
             max_visible_lines: 6,
             ideal_width: 160.0,
             wraps_lines: true,
+            first_line_indent: 0.0,
+            first_line_indent_skip: TextFieldIndentSkip::default(),
         }
     }
 }
@@ -49,6 +78,11 @@ impl TextFieldLayout {
 
     fn validate(&mut self) {
         self.max_visible_lines = self.max_visible_lines.max(1);
+        self.first_line_indent = if self.first_line_indent.is_finite() {
+            self.first_line_indent.max(0.0)
+        } else {
+            0.0
+        };
     }
 
     pub fn validated(mut self) -> Self {

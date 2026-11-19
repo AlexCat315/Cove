@@ -257,3 +257,21 @@ fn a_space_that_overflows_hangs_instead_of_indenting_the_next_line() {
         vec![3, 4]
     );
 }
+
+#[test]
+fn first_line_indent_shifts_only_the_first_row_and_narrows_its_room() {
+    let text = "abcdefghij";
+    let shaped: Vec<ShapedGlyph> = (0..text.len() as u32)
+        .map(|cluster| glyph(cluster, 5.0, 0))
+        .collect();
+    let mut opts = options(20.0, 20.0, 0.0);
+    opts.first_line_indent = 10.0;
+    let result = layout_text(&shaped, text, &Metrics, opts);
+    assert_eq!(result.lines[0].glyphs[0].x, 10.0);
+    assert_eq!(result.lines[0].width, 20.0, "two glyphs after the indent");
+    assert_eq!(result.lines[1].glyphs[0].x, 0.0, "wrapped rows stay flush");
+    assert!(
+        result.lines.len() >= 2,
+        "the reduced first-row width forces a wrap"
+    );
+}

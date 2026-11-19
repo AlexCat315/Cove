@@ -9,6 +9,7 @@ use std::rc::Rc;
 use crate::primitives::text::text_buffer::TextBuffer;
 use crate::primitives::text::text_document_layout::{TextDocumentLayout, TextLineGeometry};
 use crate::primitives::text::text_field::text_field_horizontal_scroll::HorizontalScrollState;
+use crate::primitives::text::text_field::text_field_options::TextFieldIndentSkip;
 use cove_core::scene::{Node, Point, Rect};
 use cove_core::{Font, TextLayoutResult, TextLine};
 use cove_text::TextEnvironment;
@@ -152,6 +153,9 @@ pub struct FieldLayoutInputs {
     pub horizontal_inset: f32,
     pub vertical_inset: f32,
     pub text_origin_y_offset: f32,
+    /// First-row paragraph indent; only vertical wrapping fields use it.
+    pub first_line_indent: f32,
+    pub first_line_indent_skip: TextFieldIndentSkip,
 }
 
 /// Derives the render state for the current buffer, selection and composition.
@@ -278,6 +282,12 @@ pub fn document_geometry(
         atlas,
         width,
         secure: inputs.secure && !is_placeholder,
+        first_line_indent: if inputs.is_vertical && inputs.wraps_lines && !is_placeholder {
+            inputs.first_line_indent.max(0.0)
+        } else {
+            0.0
+        },
+        first_line_indent_skip: inputs.first_line_indent_skip,
     }
 }
 

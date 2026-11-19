@@ -563,6 +563,8 @@ fn large_fold() {
                 atlas: environment.atlas_texture_id as u64,
                 width: f32::INFINITY,
                 secure: false,
+                first_line_indent: 0.0,
+                first_line_indent_skip: Default::default(),
             };
             let mut document = TextDocumentLayout::new(buffer, geometry);
             document.set_hidden_lines(vec![1..199_999]);

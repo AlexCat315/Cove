@@ -35,6 +35,8 @@ fn geometry(env: &TextEnvironment, width: f32, secure: bool) -> TextLineGeometry
         atlas: env.atlas.identity(),
         width,
         secure,
+        first_line_indent: 0.0,
+        first_line_indent_skip: Default::default(),
     }
 }
 
@@ -211,5 +213,40 @@ fn caret_and_hit_testing_share_grapheme_stops() {
                 }
             }
         });
+    });
+}
+
+#[test]
+fn first_line_indent_shows_in_rows_and_the_caret_map() {
+    with_environment(|env| {
+        let mut geometry = geometry(env, 100.0, false);
+        geometry.first_line_indent = 10.0;
+        let buffer = TextBuffer::new("ab\n\ncd");
+        let mut document = TextDocumentLayout::new(buffer.clone(), geometry);
+        let layout = visible(&mut document, 0, 4, env);
+        assert_eq!(layout.lines[0].glyphs[0].x, 10.0);
+        assert_eq!(document.caret(0, false, env), (10.0, 0));
+        assert_eq!(document.caret(3, false, env), (10.0, 1));
+        assert_eq!(document.caret(4, false, env), (10.0, 2));
+    });
+}
+
+fn skip_chapter_like(text: &str) -> bool {
+    text.starts_with('第')
+}
+
+#[test]
+fn first_line_indent_skips_heading_lines() {
+    with_environment(|env| {
+        let mut geometry = geometry(env, 100.0, false);
+        geometry.first_line_indent = 10.0;
+        geometry.first_line_indent_skip =
+            cove_ui_compose::primitives::text::TextFieldIndentSkip::new(skip_chapter_like);
+        let buffer = TextBuffer::new("第一章 雨夜\n\n正文");
+        let mut document = TextDocumentLayout::new(buffer.clone(), geometry);
+        let layout = visible(&mut document, 0, 4, env);
+        assert_eq!(layout.lines[0].glyphs[0].x, 0.0, "heading stays flush");
+        assert_eq!(layout.lines[2].glyphs[0].x, 10.0, "body is indented");
+        assert_eq!(document.caret(0, false, env), (0.0, 0));
     });
 }

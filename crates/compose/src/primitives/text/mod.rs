@@ -24,8 +24,8 @@ pub(crate) mod api {
     pub use super::text::{Divider, DividerAxis, Text};
     pub use super::text_buffer::TextBuffer;
     pub use super::text_field::{
-        FieldState, TextField, TextFieldAxis, TextFieldBehavior, TextFieldEvents, TextFieldLayout,
-        TextFieldSize,
+        FieldState, TextField, TextFieldAxis, TextFieldBehavior, TextFieldEvents,
+        TextFieldIndentSkip, TextFieldLayout, TextFieldSize,
     };
     pub use cove_core::TextAlignment;
 }

@@ -43,6 +43,10 @@ pub struct TextLayoutOptions {
     pub line_height: f32,
     pub alignment: TextAlignment,
     pub letter_spacing: f32,
+    /// Extra left offset for the first visual row of a paragraph, in points.
+    /// Wrapping accounts for it: the first row simply has less room. The text
+    /// itself is unchanged, so files stay plain.
+    pub first_line_indent: f32,
 }
 impl Default for TextLayoutOptions {
     fn default() -> Self {
@@ -51,6 +55,7 @@ impl Default for TextLayoutOptions {
             line_height: 16.0,
             alignment: TextAlignment::Leading,
             letter_spacing: 0.0,
+            first_line_indent: 0.0,
         }
     }
 }
@@ -115,7 +120,12 @@ pub fn layout_text(
     let mut lines = Vec::new();
     let mut current: Vec<Measured> = Vec::new();
     let mut start = 0;
-    let mut pen_x = 0.0;
+    let indent = if options.first_line_indent.is_finite() {
+        options.first_line_indent.max(0.0)
+    } else {
+        0.0
+    };
+    let mut pen_x = indent;
     let mut last_break = None;
     for (glyph, metrics) in measured {
         let cluster = glyph.cluster as usize;
@@ -257,6 +267,11 @@ fn build_line(
     let baseline_y = top_y + baseline;
     let mut positioned = Vec::with_capacity(glyphs.len());
     let mut pen_x = 0.0;
+    let indent = if index == 0 && options.first_line_indent.is_finite() {
+        options.first_line_indent.max(0.0)
+    } else {
+        0.0
+    };
     let mut previous = None;
     for (shaped, _) in glyphs {
         if previous.is_some_and(|cluster| cluster != shaped.cluster) {
@@ -267,16 +282,17 @@ fn build_line(
             glyph_id: shaped.glyph_id,
             font_id: shaped.font_id,
             cluster: shaped.cluster,
-            x: pen_x + shaped.x_offset,
+            x: indent + pen_x + shaped.x_offset,
             y: baseline_y + shaped.y_offset,
             atlas_info: None,
         });
         pen_x += shaped.x_advance;
     }
+    let line_width = indent + pen_x;
     let offset = match options.alignment {
-        TextAlignment::Leading if rtl => options.max_width - pen_x,
-        TextAlignment::Center => (options.max_width - pen_x) / 2.0,
-        TextAlignment::Trailing if !rtl => options.max_width - pen_x,
+        TextAlignment::Leading if rtl => options.max_width - line_width,
+        TextAlignment::Center => (options.max_width - line_width) / 2.0,
+        TextAlignment::Trailing if !rtl => options.max_width - line_width,
         _ => 0.0,
     };
     if offset != 0.0 && offset.is_finite() {
@@ -288,7 +304,7 @@ fn build_line(
         glyphs: positioned,
         baseline_y,
         top_y,
-        width: pen_x,
+        width: indent + pen_x,
         start_cluster: start,
         end_cluster: end,
     }

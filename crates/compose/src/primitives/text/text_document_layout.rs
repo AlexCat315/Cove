@@ -2,6 +2,7 @@
 //! cached strings contain individual lines, never the complete document.
 
 use super::text_buffer::TextBuffer;
+use super::text_field::text_field_options::TextFieldIndentSkip;
 use super::text_field::text_visual_line_index::TextVisualLineIndex;
 use cove_core::{Font, PositionedGlyph, TextAlignment, TextLayoutResult, TextLine};
 use cove_text::TextEnvironment;
@@ -16,6 +17,10 @@ pub struct TextLineGeometry {
     pub atlas: u64,
     pub width: f32,
     pub secure: bool,
+    /// First-row paragraph indent in points; 0 disables it.
+    pub first_line_indent: f32,
+    /// Lines this filter accepts stay flush (chapter titles, book titles).
+    pub first_line_indent_skip: TextFieldIndentSkip,
 }
 
 pub struct TextDocumentLayout {
@@ -117,6 +122,14 @@ impl TextDocumentLayout {
         }
     }
 
+    fn line_indent(&self, text: &str) -> f32 {
+        if self.geometry.first_line_indent_skip.skips(text) {
+            0.0
+        } else {
+            self.geometry.first_line_indent
+        }
+    }
+
     pub fn measured_line(&mut self, line: usize, env: &TextEnvironment) -> MeasuredTextLine {
         let row = (self.buffer.line_count() - 1).min(line);
         self.clock = self.clock.wrapping_add(1);
@@ -130,20 +143,23 @@ impl TextDocumentLayout {
         } else {
             source.clone()
         };
+        let indent = self.line_indent(&text);
         let result = if !self.geometry.width.is_finite() && text.len() > Self::SEGMENT_BYTES {
             self.segmented_layout(&text, env)
         } else {
-            (*env.cached_layout(
+            (*env.cached_layout_indented(
                 &text,
                 Some(&self.geometry.font),
                 Some(self.geometry.line_height),
                 self.geometry.width,
                 TextAlignment::Leading,
                 self.geometry.letter_spacing,
+                indent,
             ))
             .clone()
         };
-        let entry = MeasuredTextLine::new(&source, &text, &result, self.geometry.line_height);
+        let entry =
+            MeasuredTextLine::new(&source, &text, &result, self.geometry.line_height, indent);
         self.lines.insert(row, entry.clone());
         self.index.measure(row, entry.rows.len());
         self.shaped_line_count += 1;
@@ -167,7 +183,7 @@ impl TextDocumentLayout {
     /// end of a minified file reshapes only the segments it touches.
     fn segmented_layout(&self, text: &str, env: &TextEnvironment) -> TextLayoutResult {
         let mut glyphs: Vec<PositionedGlyph> = Vec::new();
-        let mut x: f32 = 0.0;
+        let mut x: f32 = self.line_indent(&text).max(0.0);
         let mut byte = 0usize;
         let mut baseline: Option<f32> = None;
         let mut top: f32 = 0.0;
@@ -399,7 +415,18 @@ pub struct MeasuredTextLine {
 }
 
 impl MeasuredTextLine {
-    pub fn new(source: &str, display: &str, layout: &TextLayoutResult, line_height: f32) -> Self {
+    pub fn new(
+        source: &str,
+        display: &str,
+        layout: &TextLayoutResult,
+        line_height: f32,
+        first_line_indent: f32,
+    ) -> Self {
+        let indent = if first_line_indent.is_finite() {
+            first_line_indent.max(0.0)
+        } else {
+            0.0
+        };
         let _ = source;
         let mut boundaries = vec![0usize];
         for (offset, grapheme) in display.grapheme_indices(true) {
@@ -410,7 +437,7 @@ impl MeasuredTextLine {
                 glyphs: Vec::new(),
                 baseline_y: line_height * 0.8,
                 top_y: 0.0,
-                width: 0.0,
+                width: indent,
                 start_cluster: 0,
                 end_cluster: 0,
             }]
@@ -419,7 +446,8 @@ impl MeasuredTextLine {
         };
         let carets: Vec<Vec<TextCharacterCaret>> = rows
             .iter()
-            .map(|row| {
+            .enumerate()
+            .map(|(row_index, row)| {
                 let mut clusters: Vec<(usize, f32)> = Vec::new();
                 for glyph in &row.glyphs {
                     if clusters.last().map(|(byte, _)| *byte) != Some(glyph.cluster as usize) {
@@ -453,7 +481,7 @@ impl MeasuredTextLine {
                 if positions.is_empty() {
                     positions.push(TextCharacterCaret {
                         character: 0,
-                        x: 0.0,
+                        x: if row_index == 0 { indent } else { 0.0 },
                     });
                 }
                 positions

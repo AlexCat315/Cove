@@ -208,7 +208,7 @@ impl Text {
                 let frame = node.absolute_frame();
                 let text = &entry.key.text;
                 let measured =
-                    MeasuredTextLine::new(text, text, &entry.result, entry.key.line_height);
+                    MeasuredTextLine::new(text, text, &entry.result, entry.key.line_height, 0.0);
                 let row = ((point.y - frame.y - padding.top) / entry.key.line_height) as usize;
                 let index = measured.character(row, point.x - frame.x - padding.left);
                 text.grapheme_indices(true)
@@ -292,6 +292,7 @@ impl Text {
             max_width
         };
         let key = TextLayoutCacheKey {
+            first_line_indent: 0.0,
             text: text.clone(),
             font: metrics.font.clone(),
             line_height: metrics.line_height,
@@ -578,7 +579,7 @@ impl PrimitiveView for Text {
                 .and_then(|scope| scope.0.borrow_mut().range_for(&node));
             if let Some(range) = selection {
                 let text = &snapshot.string;
-                let measured = MeasuredTextLine::new(text, text, &result, metrics.line_height);
+                let measured = MeasuredTextLine::new(text, text, &result, metrics.line_height, 0.0);
                 let color = theme_for_node(&node)
                     .colors
                     .selection

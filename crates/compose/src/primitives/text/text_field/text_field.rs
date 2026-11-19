@@ -727,6 +727,8 @@ impl TextField {
             horizontal_inset: self.horizontal_inset(theme),
             vertical_inset: 0.0,
             text_origin_y_offset: 0.0,
+            first_line_indent: self.layout.first_line_indent,
+            first_line_indent_skip: self.layout.first_line_indent_skip,
         }
     }
 }
@@ -1320,6 +1322,8 @@ fn measure_field(
         horizontal_inset: measure_inset_x * 0.5,
         vertical_inset: inset_y,
         text_origin_y_offset: 0.0,
+        first_line_indent: field.layout.first_line_indent,
+        first_line_indent_skip: field.layout.first_line_indent_skip,
     };
     let geometry = document_geometry(
         &inputs,

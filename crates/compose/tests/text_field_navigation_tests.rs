@@ -382,6 +382,8 @@ fn wrapped_row_affinity() {
             horizontal_inset: inset,
             vertical_inset: 0.0,
             text_origin_y_offset: 0.0,
+            first_line_indent: 0.0,
+            first_line_indent_skip: Default::default(),
         };
         let geometry = document_geometry(
             &inputs,

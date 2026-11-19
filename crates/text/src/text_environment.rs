@@ -224,6 +224,30 @@ impl TextEnvironment {
         alignment: TextAlignment,
         letter_spacing: f32,
     ) -> Arc<TextLayoutResult> {
+        self.cached_layout_indented(
+            text,
+            font,
+            line_height,
+            max_width,
+            alignment,
+            letter_spacing,
+            0.0,
+        )
+    }
+
+    /// Layout with a first-line paragraph indent. Only the first visual row is
+    /// pushed right; wrapped rows and the following paragraphs keep the full
+    /// column, and the text itself is untouched.
+    pub fn cached_layout_indented(
+        &self,
+        text: &str,
+        font: Option<&Font>,
+        line_height: Option<f32>,
+        max_width: f32,
+        alignment: TextAlignment,
+        letter_spacing: f32,
+        first_line_indent: f32,
+    ) -> Arc<TextLayoutResult> {
         let font = self.resolved_font(font);
         let line_height = self.resolved_line_height(&font, line_height);
         let max_width = if max_width.is_finite() && max_width > 0.0 {
@@ -236,6 +260,11 @@ impl TextEnvironment {
         } else {
             0.0
         };
+        let first_line_indent = if first_line_indent.is_finite() {
+            first_line_indent.max(0.0)
+        } else {
+            0.0
+        };
         let key = TextLayoutCacheKey {
             text: text.into(),
             font: font.clone(),
@@ -243,6 +272,7 @@ impl TextEnvironment {
             alignment,
             max_width,
             letter_spacing,
+            first_line_indent,
             atlas_id: self.atlas.identity(),
         };
         self.layout_cache.value(
@@ -279,6 +309,7 @@ impl TextEnvironment {
                         line_height,
                         alignment,
                         letter_spacing,
+                        first_line_indent,
                     },
                 ))
             },

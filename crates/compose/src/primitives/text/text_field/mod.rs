@@ -39,6 +39,6 @@ pub use text_field_navigation_options::TextFieldNavigation;
 pub use text_field_observation::{TextFieldCaretState, TextFieldHoverAnchor};
 pub use text_field_options::{
     TextFieldAxis, TextFieldBehavior, TextFieldCodeEditing, TextFieldCodeStorage,
-    TextFieldContentPadding, TextFieldDecoration, TextFieldEditRequest, TextFieldLayout,
-    TextFieldNavigationRequest, TextFieldSize,
+    TextFieldContentPadding, TextFieldDecoration, TextFieldEditRequest, TextFieldIndentSkip,
+    TextFieldLayout, TextFieldNavigationRequest, TextFieldSize,
 };

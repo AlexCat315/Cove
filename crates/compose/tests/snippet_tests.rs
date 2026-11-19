@@ -158,6 +158,8 @@ fn long_unwrapped_line_shapes_in_segments_with_exact_carets() {
                 atlas: 1,
                 width: f32::INFINITY,
                 secure: false,
+                first_line_indent: 0.0,
+                first_line_indent_skip: Default::default(),
             };
             let mut document = TextDocumentLayout::new(TextBuffer::new(&line), geometry);
             let measured = document.measured_line(0, &environment);

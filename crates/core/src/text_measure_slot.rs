@@ -14,6 +14,7 @@ pub struct TextLayoutCacheKey {
     pub alignment: TextAlignment,
     pub max_width: f32,
     pub letter_spacing: f32,
+    pub first_line_indent: f32,
     pub atlas_id: u64,
 }
 fn float_key(value: f32) -> u32 {
@@ -28,6 +29,7 @@ impl PartialEq for TextLayoutCacheKey {
             && float_key(self.line_height) == float_key(other.line_height)
             && float_key(self.max_width) == float_key(other.max_width)
             && float_key(self.letter_spacing) == float_key(other.letter_spacing)
+            && float_key(self.first_line_indent) == float_key(other.first_line_indent)
     }
 }
 impl Eq for TextLayoutCacheKey {}
