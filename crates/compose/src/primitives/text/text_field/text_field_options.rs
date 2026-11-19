@@ -56,6 +56,9 @@ pub struct TextFieldLayout {
     pub first_line_indent: f32,
     /// Lines this filter accepts stay flush, even with an indent configured.
     pub first_line_indent_skip: TextFieldIndentSkip,
+    /// Keep the caret row near the vertical middle of the viewport while the
+    /// document scrolls, instead of only revealing it at the bottom edge.
+    pub typewriter_scrolling: bool,
 }
 
 impl Default for TextFieldLayout {
@@ -67,6 +70,7 @@ impl Default for TextFieldLayout {
             wraps_lines: true,
             first_line_indent: 0.0,
             first_line_indent_skip: TextFieldIndentSkip::default(),
+            typewriter_scrolling: false,
         }
     }
 }

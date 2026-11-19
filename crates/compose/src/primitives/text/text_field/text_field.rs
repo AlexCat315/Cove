@@ -1635,13 +1635,20 @@ fn committed_input_area(
             state.scroll.horizontal.offset = caret_x.max(0.0);
         }
         let top = row as f32 * line_height;
-        if top < state.scroll.offset_y {
-            state.scroll.offset_y = top;
+        if field.layout.typewriter_scrolling {
+            // Keep the caret row in the middle of the viewport. At the very
+            // start and end the clamp leaves the document flush with the edge.
+            state.scroll.offset_y =
+                (top + line_height / 2.0 - height / 2.0).clamp(0.0, state.scroll.max_y);
+        } else {
+            if top < state.scroll.offset_y {
+                state.scroll.offset_y = top;
+            }
+            if top + line_height > state.scroll.offset_y + height {
+                state.scroll.offset_y = (top + line_height - height).max(0.0);
+            }
+            state.scroll.offset_y = state.scroll.offset_y.clamp(0.0, state.scroll.max_y);
         }
-        if top + line_height > state.scroll.offset_y + height {
-            state.scroll.offset_y = (top + line_height - height).max(0.0);
-        }
-        state.scroll.offset_y = state.scroll.offset_y.clamp(0.0, state.scroll.max_y);
     }
     state.scroll.committed_size = (frame.width.to_bits(), frame.height.to_bits());
     Some(cove_platform::TextInputArea {
@@ -3057,6 +3064,15 @@ fn render(
     let vertical_inset = field.vertical_inset(line_height);
     state.scroll.visible_height = (frame.height - vertical_inset * 2.0).max(line_height);
     update_scroll(&mut state.scroll, &document, line_height);
+    // Typewriter mode leaves room below the last line so it can still sit in
+    // the middle; turning it off restores the exact content height.
+    state.scroll.max_y = if field.layout.typewriter_scrolling {
+        (state.scroll.content_height + state.scroll.visible_height / 2.0
+            - state.scroll.visible_height)
+            .max(0.0)
+    } else {
+        (state.scroll.content_height - state.scroll.visible_height).max(0.0)
+    };
     // Reveal the caret before windowing so the painted rows match the scroll a
     // fresh caret position asks for.
     let mut reveal = None;
@@ -3067,13 +3083,18 @@ fn render(
             &environment,
         );
         let top = caret_row as f32 * line_height;
-        if top < state.scroll.offset_y {
-            state.scroll.offset_y = top;
+        if field.layout.typewriter_scrolling {
+            state.scroll.offset_y = (top + line_height / 2.0 - state.scroll.visible_height / 2.0)
+                .clamp(0.0, state.scroll.max_y);
+        } else {
+            if top < state.scroll.offset_y {
+                state.scroll.offset_y = top;
+            }
+            if top + line_height > state.scroll.offset_y + state.scroll.visible_height {
+                state.scroll.offset_y = (top + line_height - state.scroll.visible_height).max(0.0);
+            }
+            state.scroll.offset_y = state.scroll.offset_y.clamp(0.0, state.scroll.max_y);
         }
-        if top + line_height > state.scroll.offset_y + state.scroll.visible_height {
-            state.scroll.offset_y = (top + line_height - state.scroll.visible_height).max(0.0);
-        }
-        state.scroll.offset_y = state.scroll.offset_y.clamp(0.0, state.scroll.max_y);
         reveal = Some(caret_x);
     }
     let first_row =
