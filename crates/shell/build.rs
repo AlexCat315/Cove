@@ -3,6 +3,61 @@
 use cove_native_build as native;
 use std::env;
 
+/// SDL tears its Cocoa field editor down while the input method still owns
+/// marked text, and AppKit commits that raw pinyin through `insertText:` as
+/// the responder goes away. Clicking elsewhere mid-composition then writes
+/// `dsaasd` into the document. SDL exposes no "discard composition" call, so
+/// vendor the two-line guard here; the submodule stays pinned upstream.
+fn patch_sdl_cocoa_ime() {
+    let root = native::third_party("sdl3", "CMakeLists.txt");
+    let path = root.join("src/video/cocoa/SDL_cocoakeyboard.m");
+    let source = std::fs::read_to_string(&path)
+        .unwrap_or_else(|error| panic!("read {}: {error}", path.display()));
+    if source.contains("COVE_IME_TEARDOWN") {
+        return;
+    }
+
+    let mut patched = source.clone();
+    let ivar_old = "    Uint64 _pendingTimestamp;\n}";
+    let ivar_new =
+        "    Uint64 _pendingTimestamp;\n    BOOL _suppressInsert; // COVE_IME_TEARDOWN\n}";
+    assert!(
+        patched.contains(ivar_old),
+        "SDL text-field responder shape changed"
+    );
+    patched = patched.replacen(ivar_old, ivar_new, 1);
+
+    let decl_old = "- (void)doCommandBySelector:(SEL)myselector;";
+    let decl_new = "- (void)doCommandBySelector:(SEL)myselector;\n- (void)suppressInsert;";
+    assert!(
+        patched.contains(decl_old),
+        "SDL responder declaration changed"
+    );
+    patched = patched.replacen(decl_old, decl_new, 1);
+
+    let insert_old = "    const char *str;\n\n    DEBUG_IME(@\"insertText: %@ replacementRange: (%d, %d)\", aString,";
+    let insert_new = "    const char *str;\n\n    /* The input method can commit marked text while the field editor is torn\n       down. That commit is not user intent. */\n    if (_suppressInsert) {\n        return;\n    }\n\n    DEBUG_IME(@\"insertText: %@ replacementRange: (%d, %d)\", aString,";
+    assert!(patched.contains(insert_old), "SDL insertText shape changed");
+    patched = patched.replacen(insert_old, insert_new, 1);
+
+    let unmark_old = "- (void)unmarkText\n{";
+    let unmark_new =
+        "- (void)suppressInsert\n{\n    _suppressInsert = YES;\n}\n\n- (void)unmarkText\n{";
+    assert!(patched.contains(unmark_old), "SDL unmarkText shape changed");
+    patched = patched.replacen(unmark_old, unmark_new, 1);
+
+    let stop_old = "        if (data && data.fieldEdit) {\n            [data.fieldEdit removeFromSuperview];\n            data.fieldEdit = nil;\n        }";
+    let stop_new = "        if (data && data.fieldEdit) {\n            /* Drop the marked composition without committing it. */\n            [data.fieldEdit suppressInsert];\n            [data.fieldEdit unmarkText];\n            [data.fieldEdit removeFromSuperview];\n            data.fieldEdit = nil;\n        }";
+    assert!(
+        patched.contains(stop_old),
+        "SDL StopTextInput shape changed"
+    );
+    patched = patched.replacen(stop_old, stop_new, 1);
+
+    std::fs::write(&path, patched)
+        .unwrap_or_else(|error| panic!("write {}: {error}", path.display()));
+}
+
 fn main() {
     for path in [
         "native",
@@ -12,6 +67,9 @@ fn main() {
         println!("cargo:rerun-if-changed={path}");
     }
     let os = env::var("CARGO_CFG_TARGET_OS").unwrap();
+    if os == "macos" {
+        patch_sdl_cocoa_ime();
+    }
 
     let mut sdl = native::cmake("sdl3", &native::third_party("sdl3", "CMakeLists.txt"));
     sdl.define("SDL_STATIC", "ON")

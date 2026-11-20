@@ -352,6 +352,11 @@ pub trait Shell {
     fn wait_for_events(&self, timeout: Duration) -> bool;
     fn wake_event_loop(&self);
     fn set_text_input_area(&self, id: WindowId, area: Option<TextInputArea>);
+    /// Dismiss any live platform composition (including the native candidate
+    /// window). The next area update restarts text input.
+    fn cancel_text_input(&self, id: WindowId) {
+        self.set_text_input_area(id, None);
+    }
     /// Explicit on-screen keyboard control for touch hosts. Shells without a
     /// software keyboard keep the native text-input focus path unchanged.
     fn show_soft_keyboard(&self, _id: WindowId) {}

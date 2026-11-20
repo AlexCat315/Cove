@@ -1725,6 +1725,12 @@ fn pointer_character(
     )
 }
 
+/// Characters Cocoa's IME uses inside a marked pinyin composition but commits
+/// through `insertText:` when the syllable boundary is typed.
+fn is_ime_separator(c: char) -> bool {
+    matches!(c, '\'' | '\u{2018}' | '\u{2019}' | '"' | '\u{201c}' | '\u{201d}')
+}
+
 fn notify_composition(node: &Node, state: &Rc<RefCell<FieldState>>) {
     let composing = state.borrow().composition.is_active();
     if let Some(handler) = node.attachment::<cove_core::scene::TextInputEditingChangeHandler>(
@@ -1933,6 +1939,16 @@ fn install_interaction(
                         ));
                         return EventResult::Handled;
                     }
+                    // Resolve the character under the pointer before focus is
+                    // handed over: focusing an editor can reveal its previous
+                    // caret and scroll the document, which would move the line
+                    // under the pointer between hit-testing and caret placement.
+                    let click_index = pointer_character(
+                        &owner,
+                        &pointer_field,
+                        &pointer_state,
+                        Point::new(event.x, event.y),
+                    );
                     if let Some(chain) = FocusChainHolder::current() {
                         chain.focus(Some(&owner), true);
                     }
@@ -1945,12 +1961,7 @@ fn install_interaction(
                         state.selection.anchor = Some(0);
                         state.selection.cursor_index = state.buffer.character_count();
                         state.record_activity();
-                    } else if let Some(index) = pointer_character(
-                        &owner,
-                        &pointer_field,
-                        &pointer_state,
-                        Point::new(event.x, event.y),
-                    ) {
+                    } else if let Some(index) = click_index {
                         let mut state = pointer_state.borrow_mut();
                         state.clear_composition();
                         if event.clicks >= 2 {
@@ -2044,6 +2055,13 @@ fn install_interaction(
     let text_behavior = field.behavior.clone();
     let text_limit = field.behavior.max_length;
     let text_binding = field.text.clone();
+    // Cocoa commits the IME's syllable separator (`'`) through `insertText:`,
+    // which first unmarks the composition. SDL forwards that punctuation as
+    // ordinary text, so without this guard the apostrophes land in the buffer
+    // while the pinyin stays in the composition preview, leaving stray
+    // quotes behind when the candidate is finally committed.
+    let separator_guard = Rc::new(RefCell::new(false));
+    let text_separator_guard = separator_guard.clone();
     registry.set_text(
         node,
         InputHandlerRoute::text_input(),
@@ -2055,6 +2073,15 @@ fn install_interaction(
                 return EventResult::Ignored;
             };
             text_state.borrow_mut().normalize(&text_binding.get());
+            if incoming.is_empty() {
+                return EventResult::Handled;
+            }
+            let unmarked = std::mem::take(&mut *text_separator_guard.borrow_mut());
+            if unmarked && incoming.chars().all(is_ime_separator) {
+                // The composition still owns these characters; the next
+                // editing event carries them inside the marked text.
+                return EventResult::Handled;
+            }
             insert_replacing_selection_limited(&mut text_state.borrow_mut(), incoming, text_limit);
             // Publish the edit back to the caller's binding. Nothing ever wrote
             // `field.text`, so `TextFieldHost::update_node` re-read the unchanged
@@ -2083,6 +2110,7 @@ fn install_interaction(
     let editing_node = node.downgrade();
     let editing_state = state.clone();
     let editing_behavior = field.behavior.clone();
+    let editing_separator_guard = separator_guard.clone();
     registry.set_editing(
         node,
         InputHandlerRoute::text_input(),
@@ -2119,6 +2147,16 @@ fn install_interaction(
             } else {
                 pending.character_index_for_utf8_offset(last_byte)
             };
+            // An empty marked-text update right after a live composition is
+            // Cocoa's `unmarkText`, not a user cancellation: `insertText:` may
+            // immediately follow with punctuation that belongs to the
+            // composition.
+            let was_composing = state.composition.is_active();
+            if event.text.is_empty() && was_composing {
+                *editing_separator_guard.borrow_mut() = true;
+            } else if !event.text.is_empty() {
+                *editing_separator_guard.borrow_mut() = false;
+            }
             state.composition.text = event.text.clone();
             state.composition.start = start;
             state.composition.length = end.saturating_sub(start);

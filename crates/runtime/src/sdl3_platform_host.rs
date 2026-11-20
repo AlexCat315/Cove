@@ -151,6 +151,9 @@ pub struct PlatformWindowSession {
     drawable_size: Cell<(u32, u32)>,
     logical_size: Cell<(u32, u32)>,
     content_scale: Cell<f32>,
+    /// Live shell, used to cancel a native IME composition before a pointer
+    /// click can move the caret out from under the candidate window.
+    shell: Rc<RefCell<Box<dyn Shell>>>,
 }
 impl PlatformWindowSession {
     fn new(
@@ -194,6 +197,7 @@ impl PlatformWindowSession {
             drawable_size: Cell::new(handle.drawable_size()),
             logical_size: Cell::new(handle.logical_size()),
             content_scale: Cell::new(handle.content_scale_factor()),
+            shell,
         }
     }
     pub fn with_current<R>(&self, body: impl FnOnce() -> R) -> R {
@@ -264,6 +268,14 @@ impl PlatformWindowSession {
             InputEvent::MouseButtonDown(_) | InputEvent::KeyDown(_) | InputEvent::WindowFocusGained
         ) {
             self.local_text_focus.set(false);
+        }
+        if matches!(event, InputEvent::MouseButtonDown(_)) {
+            // A click outside the candidate window must dismiss the platform
+            // IME popup as well as the composition preview. Stopping text
+            // input removes the field editor (and its candidate window); the
+            // next frame re-arms the area and starts input again.
+            self.shell.borrow().cancel_text_input(self.id);
+            self.last_text_input_area.set(None);
         }
         match event {
             InputEvent::MouseMotion(_) | InputEvent::MouseWheel(_) => {
