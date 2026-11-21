@@ -354,6 +354,7 @@ dependencies = [
 name = "cove-agent"
 version = "0.3.2"
 dependencies = [
+ "cove-http",
  "serde",
  "serde_json",
 ]

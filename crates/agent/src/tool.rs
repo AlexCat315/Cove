@@ -121,6 +121,8 @@ impl AgentToolResult {
 pub enum AgentError {
     InvalidConfiguration(String),
     UnknownTool(String),
+    Model(String),
+    HttpStatus(u16),
     InvalidResult,
     StepLimit,
 }
@@ -128,8 +130,9 @@ pub enum AgentError {
 impl AgentError {
     pub fn message(&self) -> String {
         match self {
-            Self::InvalidConfiguration(message) => message.clone(),
+            Self::InvalidConfiguration(message) | Self::Model(message) => message.clone(),
             Self::UnknownTool(name) => format!("Unknown tool: {name}"),
+            Self::HttpStatus(status) => format!("The model server returned HTTP {status}."),
             Self::InvalidResult => "Tool returned invalid JSON/media or exceeded the result limit (JSON: 512 KiB; images: 1 MiB encoded).".into(),
             Self::StepLimit => "Agent reached its tool round limit.".into(),
         }
@@ -262,6 +265,9 @@ pub enum AgentRole {
 pub struct AgentMessage {
     pub role: AgentRole,
     pub text: String,
+    /// Provider continuation data, separate from the user-visible answer.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reasoning_content: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub calls: Vec<AgentToolCall>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -275,6 +281,7 @@ impl AgentMessage {
         Self {
             role,
             text: String::new(),
+            reasoning_content: None,
             calls: Vec::new(),
             result_for: None,
             is_error: false,
@@ -296,6 +303,8 @@ impl AgentMessage {
 pub enum AgentReply {
     Answer(String),
     Tools(Vec<AgentToolCall>),
+    /// An assistant turn carrying provider continuation data and optional calls.
+    Assistant(AgentMessage),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -341,7 +350,10 @@ impl AgentSession {
             if messages.len() > 256
                 || messages
                     .iter()
-                    .map(|message| message.text.len())
+                    .map(|message| {
+                        message.text.len()
+                            + message.reasoning_content.as_ref().map_or(0, String::len)
+                    })
                     .sum::<usize>()
                     > 1_048_576
             {
@@ -349,56 +361,66 @@ impl AgentSession {
                     "Conversation exceeds the message or byte limit.".into(),
                 ));
             }
-            let reply = (self.model)(&messages, &self.toolbox.tools)?;
-            match reply {
-                AgentReply::Answer(text) => {
-                    if text.len() > 262_144 {
-                        return Err(AgentError::InvalidResult);
-                    }
-                    messages.push(AgentMessage::text(AgentRole::Assistant, text.clone()));
-                    return Ok(AgentRun {
-                        answer: text,
-                        messages,
-                        tool_rounds: round,
-                    });
-                }
-                AgentReply::Tools(calls) => {
-                    if round == self.maximum_tool_rounds {
-                        return Err(AgentError::StepLimit);
-                    }
-                    let mut ids = std::collections::BTreeSet::new();
-                    if calls.is_empty()
-                        || calls.len() > 16
-                        || !calls
-                            .iter()
-                            .all(|call| !call.id.is_empty() && call.id.len() <= 128)
-                        || !calls.iter().all(|call| ids.insert(call.id.clone()))
-                    {
-                        return Err(AgentError::InvalidConfiguration(
-                            "Model returned invalid tool calls.".into(),
-                        ));
-                    }
-                    let mut assistant = AgentMessage::new(AgentRole::Assistant);
-                    assistant.calls = calls.clone();
-                    messages.push(assistant);
-                    for call in calls {
-                        let result = self.toolbox.execute(&call.name, &call.arguments);
-                        let (text, is_error) = match result {
-                            Ok(result) => (
-                                String::from_utf8_lossy(&result.json).to_string(),
-                                result.is_error,
-                            ),
-                            Err(error) => (
-                                serde_json::json!({ "error": error.message() }).to_string(),
-                                true,
-                            ),
-                        };
-                        let mut message = AgentMessage::text(AgentRole::Tool, text);
-                        message.result_for = Some(call.id.clone());
-                        message.is_error = is_error;
-                        messages.push(message);
-                    }
-                }
+            let mut assistant = match (self.model)(&messages, &self.toolbox.tools)? {
+                AgentReply::Answer(text) => AgentMessage::text(AgentRole::Assistant, text),
+                AgentReply::Tools(calls) if !calls.is_empty() => AgentMessage {
+                    calls,
+                    ..AgentMessage::new(AgentRole::Assistant)
+                },
+                AgentReply::Tools(_) => return Err(AgentError::InvalidResult),
+                AgentReply::Assistant(message) => message,
+            };
+            if assistant.role != AgentRole::Assistant
+                || assistant.text.len() > 262_144
+                || assistant
+                    .reasoning_content
+                    .as_ref()
+                    .is_some_and(|text| text.len() > 524_288)
+            {
+                return Err(AgentError::InvalidResult);
+            }
+            if assistant.calls.is_empty() {
+                let answer = assistant.text.clone();
+                messages.push(assistant);
+                return Ok(AgentRun {
+                    answer,
+                    messages,
+                    tool_rounds: round,
+                });
+            }
+            if round == self.maximum_tool_rounds {
+                return Err(AgentError::StepLimit);
+            }
+            let calls = std::mem::take(&mut assistant.calls);
+            let mut ids = std::collections::BTreeSet::new();
+            if calls.len() > 16
+                || !calls
+                    .iter()
+                    .all(|call| !call.id.is_empty() && call.id.len() <= 128)
+                || !calls.iter().all(|call| ids.insert(&call.id))
+            {
+                return Err(AgentError::InvalidConfiguration(
+                    "Model returned invalid tool calls.".into(),
+                ));
+            }
+            assistant.calls = calls.clone();
+            messages.push(assistant);
+            for call in calls {
+                let result = self.toolbox.execute(&call.name, &call.arguments);
+                let (text, is_error) = match result {
+                    Ok(result) => (
+                        String::from_utf8_lossy(&result.json).to_string(),
+                        result.is_error,
+                    ),
+                    Err(error) => (
+                        serde_json::json!({ "error": error.message() }).to_string(),
+                        true,
+                    ),
+                };
+                let mut message = AgentMessage::text(AgentRole::Tool, text);
+                message.result_for = Some(call.id);
+                message.is_error = is_error;
+                messages.push(message);
             }
         }
         Err(AgentError::StepLimit)

@@ -1015,7 +1015,7 @@ impl PrimitiveView for TextFieldHost {
             if self.field.navigation.caret_request_focus
                 && let Some(chain) = FocusChainHolder::current()
             {
-                chain.focus(Some(node), false);
+                chain.focus_after_modal(node, false);
             }
             notify_caret(node, &state_handle);
         }

@@ -1,8 +1,12 @@
 //! UI-free agent foundation: JSON Schema subset, tools, the provider-neutral
 //! tool loop, skills, MCP and its line transports.
 //!
-//! Depends only on serde; UI hosts add their handlers on top (`cove-devtools`).
+//! The optional `openai-compatible` feature adds a model adapter over Cove HTTP.
+//! UI hosts add their own tools on top.
 mod mcp;
+#[cfg(feature = "openai-compatible")]
+pub mod openai_compatible;
+pub mod retrieval;
 mod schema;
 mod skills;
 mod tool;

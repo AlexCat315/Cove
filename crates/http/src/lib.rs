@@ -276,6 +276,12 @@ impl Client {
         }
     }
 
+    /// Send a request without adding its headers or body to network diagnostics.
+    pub fn send_unrecorded(&self, request: Request) -> Result<Response, HttpError> {
+        let url = request.validate()?;
+        backend::send(&self.config, request, url)
+    }
+
     pub fn capabilities() -> Capabilities {
         backend::capabilities()
     }

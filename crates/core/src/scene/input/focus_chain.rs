@@ -371,6 +371,27 @@ impl FocusChain {
         self.notify_focus_change(previous.as_ref(), false);
         self.notify_focus_change(node, true);
     }
+    /// Focus an editor now, or restore it when a covering modal closes.
+    /// Useful for edit commands issued from inside a dialog.
+    pub fn focus_after_modal(&self, node: &Node, visible: bool) {
+        if self.permits_input(node) {
+            self.focus(Some(node), visible);
+            return;
+        }
+        let mut scopes = self.scopes.borrow_mut();
+        if let Some(scope) = scopes.iter_mut().find(|scope| {
+            !scope.restores_commands
+                && scope
+                    .root
+                    .as_ref()
+                    .is_some_and(|root| !self.belongs_to_scope(node, root, &mut Vec::new()))
+        }) {
+            scope.previous = Some(node.clone());
+            scope.previous_tree_root = Some(tree_root(node));
+            scope.visible = visible;
+        }
+    }
+
     /// Move focus to the next focusable node in tree order, wrapping around.
     pub fn focus_next(&self, root: &Node) -> Option<Node> {
         let scope_root = self.active_scope_root().unwrap_or_else(|| root.clone());
@@ -539,6 +560,25 @@ mod tests {
         assert_eq!(chain.focused(), Some(inside));
         chain.end_modal(&modal);
         assert_eq!(chain.focused(), Some(first));
+    }
+
+    #[test]
+    fn explicit_editor_focus_waits_for_covering_modal() {
+        let (root, previous, editor, _) = tree();
+        let chain = FocusChain::new();
+        chain.focus(Some(&previous), true);
+        let modal = Node::new();
+        let inside = Node::new();
+        inside.set_is_focusable(true);
+        modal.add_child(&inside);
+        root.add_child(&modal);
+        chain.begin_modal(&modal);
+
+        chain.focus_after_modal(&editor, false);
+        assert_eq!(chain.focused(), Some(inside));
+        chain.end_modal(&modal);
+        assert_eq!(chain.focused(), Some(editor));
+        assert!(!chain.is_focus_visible());
     }
 
     #[test]
