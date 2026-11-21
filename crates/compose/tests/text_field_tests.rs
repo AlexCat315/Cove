@@ -1399,6 +1399,131 @@ fn drag_uses_the_painted_rows_of_wrapped_paragraphs() {
 }
 
 #[test]
+fn scrolled_caret_and_drag_follow_the_visible_text() {
+    with_rig(|rig| {
+        let source = (0..60)
+            .map(|line| format!("Paragraph {line:02}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        rig.set(&source);
+        TextEnvironmentHolder::set_current(Some(test_text_environment(16.0, 20.0)));
+        let previous = PointerCaptureHolder::current();
+        PointerCaptureHolder::set_current(Some(Rc::new(PointerCapture::new())));
+        let padding = 8.0;
+        let cursor = Color::from_rgba8(139, 47, 73, 255);
+        rig.install(
+            TextField::new("", rig.binding())
+                .layout(vertical())
+                .decoration(TextFieldDecoration {
+                    content_padding: Some(
+                        cove_ui_compose::primitives::text::text_field::TextFieldContentPadding::new(
+                            padding, padding,
+                        ),
+                    ),
+                    cursor_color: Some(cursor),
+                    ..Default::default()
+                }),
+        );
+        rig.graph.compute_layout(200.0, 180.0);
+        let node = rig.field();
+        let state = state_of(&node).unwrap();
+        let handlers = rig.handlers(&node);
+        let pointer = handlers.pointer.unwrap();
+        let motion = handlers.motion.unwrap();
+        let scroll = handlers.wheel.unwrap();
+        use cove_ui_compose::primitives::text::text_field::{
+            RenderCacheEntry, text_field_layout_engine::RENDER_CACHE_KEY,
+        };
+        let painted = || {
+            node.attachment::<RenderCacheEntry>(RENDER_CACHE_KEY)
+                .unwrap()
+        };
+        draw(&node);
+        scroll(&wheel(-8.25), EventPhase::Target);
+        draw(&node);
+
+        let frame = node.absolute_frame();
+        let offset = node.content_offset().y;
+        let cache = painted();
+        let height = cache.key.line_height;
+        assert!(offset > height);
+        let visible = |cache: &RenderCacheEntry| {
+            cache
+                .layout
+                .lines
+                .iter()
+                .filter_map(|line| {
+                    let y = padding + line.top_y - offset;
+                    (y >= 0.0 && y + height < frame.height)
+                        .then_some((line.start_cluster as usize, y))
+                })
+                .collect::<Vec<_>>()
+        };
+        let rows = visible(&cache);
+        let (first, first_top) = rows[0];
+        let (last, last_top) = rows[2];
+        let x = frame.x + 2.0;
+        let y = |top| frame.y + top + height / 2.0;
+        pointer(
+            &press(x, y(first_top), 1),
+            PointerPhase::Down,
+            EventPhase::Target,
+        );
+        pointer(
+            &press(x, y(first_top), 1),
+            PointerPhase::Up,
+            EventPhase::Target,
+        );
+        let frame_with_caret = draw(&node);
+        assert_eq!(state.borrow().selection.cursor_index, first);
+        assert_eq!(node.content_offset().y, offset);
+        let caret_top = frame_with_caret
+            .vertices()
+            .iter()
+            .filter(|vertex| vertex.color == cursor.rgba8())
+            .map(|vertex| vertex.y)
+            .reduce(f32::min)
+            .expect("a clicked row shows the insertion caret");
+        assert!(
+            (caret_top - first_top).abs() < 0.1,
+            "{caret_top} != {first_top}"
+        );
+
+        // The next wheel event updates the live viewport before it paints.
+        // Input against the current frame must still hit the old visible rows.
+        scroll(&wheel(-1.0), EventPhase::Target);
+        assert_ne!(node.content_offset().y, offset);
+        pointer(
+            &press(x, y(last_top), 1),
+            PointerPhase::Down,
+            EventPhase::Target,
+        );
+        motion(
+            &MouseMotionEvent {
+                x,
+                y: y(first_top),
+                delta_x: 0.0,
+                delta_y: first_top - last_top,
+                kind: Default::default(),
+            },
+            EventPhase::Target,
+        );
+        pointer(
+            &press(x, y(first_top), 1),
+            PointerPhase::Up,
+            EventPhase::Target,
+        );
+        assert_eq!(state.borrow().selection_range(), Some((first, last)));
+        handlers.text.unwrap()("Replacement\n", EventPhase::Target);
+        assert_eq!(
+            rig.text(),
+            format!("{}Replacement\n{}", &source[..first], &source[last..])
+        );
+        PointerCaptureHolder::set_current(previous);
+    });
+}
+
+#[test]
 fn motion_ignored_without_drag() {
     with_rig(|rig| {
         rig.set("abc");

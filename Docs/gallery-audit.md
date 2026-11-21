@@ -805,6 +805,7 @@ Swift 目录没有、Rust 新增的 8 页：SingleLineText、CompletionPopover�
 | Timeline | 共享 Rust 行为与场景回归 | 本轮未作原生设备验收 | Website/src/content/components/timeline.md |
 | TabView | 共享 Rust 行为与场景回归 | 本轮未作原生设备验收 | Website/src/content/components/tab-view.md |
 | DateRangeCalendar | 共享 Rust 行为与场景回归 | 本轮未作原生设备验收 | Website/src/content/components/date-range.md |
+| TextField / 滚动选区 | 场景测试覆盖滚动后的光标位置、重绘前的滚轮事件和跨段选区替换 | macOS Ruwriter DevTools 验证滚动后点击光标、正反向跨段拖选、替换与撤销 | Website/src/content/components/text-field.md |
 | TextField / Code gutter | 挂载控件与正文共用几何；真实场景指针点击、输入框 F9/折叠快捷键、标记重基 | 本轮未作原生键盘或 IME 验收 | Website/src/content/components/text-field.md |
 
 未增加按平台跳过的生产实现；原生 Windows、Linux、iOS、Android 的设备验收继续独立跟踪。

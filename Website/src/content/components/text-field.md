@@ -42,6 +42,8 @@ fn editor(cx: &Scope) -> impl View {
 
 垂直字段按行盒测量，随内容增高到 `max_visible_lines`，之后固定高度并滚动。显式换行也会让默认横向字段增高，直到同一个上限。滚动到上限后，滚轮以 `MULTILINE_WHEEL_STEP`（30pt）为一格移动视口；未溢出时滚轮继续传给外层滚动视图。
 
+滚动后的点击和拖选以屏幕上已绘制的行位置为准。点击自动折行的行尾时，光标留在点击的那一行。
+
 ```rust
 fn notes(cx: &Scope) -> impl View {
     let text = cx.state(|| TextBuffer::new(""));

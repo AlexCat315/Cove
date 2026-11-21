@@ -15,7 +15,7 @@ use crate::primitives::text::code::minimap::{
     MINIMAP_WIDTH, MinimapGeometry, ink_runs, strip_color,
 };
 use crate::primitives::text::text_buffer::TextBuffer;
-use crate::primitives::text::text_document_layout::TextDocumentLayout;
+use crate::primitives::text::text_document_layout::{TextDocumentLayout, TextLineGeometry};
 use crate::primitives::text::text_edit_history::{Snapshot, TextEditHistory, TextEditKind};
 use crate::primitives::text::text_editing_commands::TextEditingCommands;
 use crate::theme::styles::components::AnyTextFieldStyle;
@@ -57,6 +57,7 @@ use super::text_field_options::{
     TextFieldEditRequest, TextFieldLayout, TextFieldNavigationRequest, TextFieldSize,
 };
 
+const PAINTED_TEXT_VIEWPORT: &str = "__textfield_painted_viewport";
 const SCROLLBAR_HOVERED: &str = "__textfield_scrollbar_hovered";
 const FOCUS_REQUEST_ID: &str = "__textfield_focus_request_id";
 const CARET_REQUEST_ID: &str = "__textfield_caret_request_id";
@@ -1674,7 +1675,7 @@ fn committed_input_area(
 fn document_layout(
     node: &Node,
     buffer: TextBuffer,
-    geometry: crate::primitives::text::text_document_layout::TextLineGeometry,
+    geometry: TextLineGeometry,
 ) -> Rc<RefCell<TextDocumentLayout>> {
     let document = match node.attachment::<Rc<RefCell<TextDocumentLayout>>>(DOCUMENT_LAYOUT_KEY) {
         Some(document) => {
@@ -1694,17 +1695,48 @@ fn document_layout(
     document
 }
 
+/// The row index and origin used by the frame the pointer can actually see.
+#[derive(Clone)]
+struct PaintedTextViewport {
+    buffer: TextBuffer,
+    geometry: TextLineGeometry,
+    rows: super::text_visual_line_index::TextVisualLineIndex,
+    text_origin: Point,
+}
+
 fn pointer_character(
     node: &Node,
     field: &TextField,
     state: &Rc<RefCell<FieldState>>,
     point: Point,
-) -> Option<usize> {
+) -> Option<(usize, bool)> {
     let environment = TextEnvironmentHolder::current()?;
+    let local = node.convert_from_window(point);
+    let mut state = state.borrow_mut();
+    if !state.composition.is_active()
+        && let Some(painted) = node.attachment::<PaintedTextViewport>(PAINTED_TEXT_VIEWPORT)
+        && state.buffer == painted.buffer
+    {
+        let x = local.x - painted.text_origin.x;
+        let row = ((local.y - painted.text_origin.y) / painted.geometry.line_height.max(1.0))
+            .max(0.0) as usize;
+        let (line, subrow) = painted.rows.location_at_row(row);
+        let document = document_layout(node, painted.buffer, painted.geometry);
+        let measured = document.borrow_mut().measured_line(line, &environment);
+        let column = measured.character(subrow, x);
+        // A soft wrap shares a caret index between the end of one row and
+        // the start of the next. Keep the clicked side of that boundary.
+        let affinity =
+            measured.caret(column, false).1 != subrow && measured.caret(column, true).1 == subrow;
+        return Some((
+            state.buffer.character_index_for_line(line, column),
+            affinity,
+        ));
+    }
+
     let theme = theme_for_node(node);
     let token = resolved_text_style(node, &theme);
     let line_height = token.line_height;
-    let mut state = state.borrow_mut();
     let addons = field.addon_layouts(
         node,
         &theme,
@@ -1730,7 +1762,7 @@ fn pointer_character(
         true,
     );
     if rendered.shows_placeholder {
-        return Some(0);
+        return Some((0, false));
     }
     let geometry = document_geometry(
         &field.inputs(&theme),
@@ -1747,22 +1779,25 @@ fn pointer_character(
     );
     let document = document_layout(node, rendered.buffer, geometry);
     let mut document = document.borrow_mut();
-    let origin = node.absolute_origin();
-    let painted_offset = node.content_offset();
-    let x = point.x - origin.x - leading + painted_offset.x;
-    let row = ((point.y - origin.y - field.vertical_inset(line_height) + painted_offset.y).max(0.0)
+    let offset = node.content_offset();
+    let x = local.x - leading + offset.x;
+    let row = ((local.y - field.vertical_inset(line_height) + offset.y).max(0.0)
         / line_height.max(1.0)) as usize;
-    Some(
+    Some((
         document
             .character(row, x, &environment)
             .min(current.character_count()),
-    )
+        false,
+    ))
 }
 
 /// Characters Cocoa's IME uses inside a marked pinyin composition but commits
 /// through `insertText:` when the syllable boundary is typed.
 fn is_ime_separator(c: char) -> bool {
-    matches!(c, '\'' | '\u{2018}' | '\u{2019}' | '"' | '\u{201c}' | '\u{201d}')
+    matches!(
+        c,
+        '\'' | '\u{2018}' | '\u{2019}' | '"' | '\u{201c}' | '\u{201d}'
+    )
 }
 
 fn notify_composition(node: &Node, state: &Rc<RefCell<FieldState>>) {
@@ -1995,7 +2030,7 @@ fn install_interaction(
                         state.selection.anchor = Some(0);
                         state.selection.cursor_index = state.buffer.character_count();
                         state.record_activity();
-                    } else if let Some(index) = click_index {
+                    } else if let Some((index, affinity)) = click_index {
                         let mut state = pointer_state.borrow_mut();
                         state.clear_composition();
                         if event.clicks >= 2 {
@@ -2012,9 +2047,13 @@ fn install_interaction(
                             state.record_activity();
                         } else {
                             state.move_cursor(index, event.modifiers.has_shift(), None);
+                            state.selection.line_end_affinity = affinity;
                         }
                     }
                     let mut state = pointer_state.borrow_mut();
+                    // A click in the viewport must not move the text under a
+                    // drag before its next motion event arrives.
+                    state.scroll.needs_caret_reveal = false;
                     state.is_dragging = true;
                     state.is_focused = true;
                     drop(state);
@@ -2061,13 +2100,20 @@ fn install_interaction(
                 {
                     return EventResult::Ignored;
                 }
-                if let Some(index) = pointer_character(
-                    &owner,
-                    &motion_field,
-                    &motion_state,
-                    Point::new(event.x, event.y),
-                ) {
-                    motion_state.borrow_mut().move_cursor(index, true, None);
+                let point = Point::new(event.x, event.y);
+                if let Some((index, affinity)) =
+                    pointer_character(&owner, &motion_field, &motion_state, point)
+                {
+                    let mut state = motion_state.borrow_mut();
+                    state.move_cursor(index, true, None);
+                    state.selection.line_end_affinity = affinity;
+                    let local = owner.convert_from_window(point);
+                    let frame = owner.frame();
+                    state.scroll.needs_caret_reveal = local.y < 0.0
+                        || local.y >= frame.height
+                        || local.x < 0.0
+                        || local.x >= frame.width;
+                    drop(state);
                     notify_caret(&owner, &motion_state);
                     owner.mark_render_dirty(cove_core::scene::InvalidationSource::style_set(
                         "textFieldSelection",
@@ -3184,6 +3230,7 @@ fn render(
         ((state.scroll.offset_y / line_height.max(1.0)).floor() as usize).saturating_sub(1);
     let row_count = ((state.scroll.visible_height / line_height.max(1.0)).ceil() as usize) + 3;
     let layout = document.visible_layout(first_row, row_count, &environment);
+    let painted_rows = document.index().clone();
     state.scroll.horizontal.synchronize(
         &render_state.buffer,
         &geometry,
@@ -3217,6 +3264,15 @@ fn render(
     let text_origin = Point::new(
         origin.x + inset + addons.leading() - state.scroll.horizontal.offset,
         origin.y + vertical_inset - state.scroll.offset_y,
+    );
+    node.set_attachment(
+        PAINTED_TEXT_VIEWPORT,
+        PaintedTextViewport {
+            buffer: render_state.buffer.clone(),
+            geometry,
+            rows: painted_rows,
+            text_origin: Point::new(text_origin.x - origin.x, text_origin.y - origin.y),
+        },
     );
     let text_color = field
         .decoration
@@ -3419,7 +3475,7 @@ fn render(
             &environment,
         );
         let caret_color = field.decoration.cursor_color.unwrap_or(theme.colors.accent);
-        let top = text_origin.y + (row as f32 - first_row as f32) * line_height;
+        let top = text_origin.y + row as f32 * line_height;
         if let Some(session) = node.first_resource::<TextCompletionSession>() {
             let absolute = node.absolute_frame();
             session.update_anchor(Rect::new(
