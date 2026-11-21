@@ -526,12 +526,7 @@ fn commit(
 }
 
 fn validate_id(id: &str) -> Result<(), CheckpointError> {
-    if id.is_empty()
-        || id.len() > 128
-        || id.bytes().any(|byte| {
-            !(byte.is_ascii_lowercase() || byte.is_ascii_digit() || b"-_".contains(&byte))
-        })
-    {
+    if !crate::portable_storage_id(id) {
         return Err(CheckpointError::Invalid(
             "run ID must be 1–128 lowercase ASCII letters, digits, hyphens or underscores",
         ));

@@ -8,7 +8,9 @@ description = "Cove agent tools, skills, MCP server and line transports"
 
 [features]
 checkpoint-files = ["dep:cove-system"]
+memory-files = ["dep:cove-system"]
 openai-compatible = ["dep:cove-http"]
+workflow-files = ["checkpoint-files"]
 
 [dependencies]
 cove-http = { workspace = true, optional = true }

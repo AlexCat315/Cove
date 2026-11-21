@@ -83,6 +83,109 @@ fn next_inventory_step(
 
 工具实现可选用 `AgentToolbox::with_context`。它会收到稳定的调用标识，便于在外部系统查询写入回执，或实现幂等去重。恢复时可用 `checkpoint.tool_key()` 取得同一个标识，核对后再提交 `RecordOutcome`。
 
+## 通用工作流
+
+`workflow::WorkflowPlan` 声明步骤、依赖、输入与产物的 JSON Schema。Agent 步骤可分别绑定模型、技能和工具。每个步骤接收直接依赖的产物和它明确请求的原始输入。Cove 在接收计划时检查循环和缺失依赖，在放行下游前校验产物。
+
+```rust
+use std::{collections::BTreeMap, sync::Arc};
+use cove_agent::{AgentSession, JsonSchema};
+use cove_agent::checkpoint::{CheckpointStore, ToolPolicy};
+use cove_agent::workflow::{
+    ArtifactFormat, StepAction, WorkflowError, WorkflowPlan, WorkflowRunner,
+    WorkflowStep, WorkflowStore,
+};
+use serde_json::json;
+
+fn start_purchase(
+    store: &dyn WorkflowStore,
+    checkpoints: &dyn CheckpointStore,
+    agents: &BTreeMap<String, Arc<AgentSession>>,
+) -> Result<(), WorkflowError> {
+    let text = JsonSchema::string(None, None);
+    let plan = WorkflowPlan::new(text.clone(), vec![
+        WorkflowStep {
+            id: "verify".into(),
+            dependencies: vec![],
+            uses_input: true,
+            action: StepAction::Agent {
+                agent: "purchasing".into(),
+                instructions: "核实采购数量与交付日期，给出审核摘要。".into(),
+                format: ArtifactFormat::Text,
+                tool_policy: ToolPolicy::ConfirmWrites,
+            },
+            output: text.clone(),
+        },
+        WorkflowStep {
+            id: "approve".into(),
+            dependencies: vec!["verify".into()],
+            uses_input: false,
+            action: StepAction::Review,
+            output: text,
+        },
+    ])?;
+    let runner = WorkflowRunner::new(&plan, store, checkpoints, agents, "office-a")?;
+    runner.start("request-42", json!("采购两张办公桌，月底前交付。"))?;
+    runner.advance("request-42", "verify")?;
+    Ok(())
+}
+```
+
+- 宿主通过 `ready_steps` 发现可推进的步骤，可在工作线程并行运行互不依赖的步骤。用 `advance` 推进单步，或用 `drive_step` 运行到检查点、工具确认或产物提交。遇到工具确认或中断写入后，用 `agent_checkpoint` 检查状态和版本，再用 `resolve_tool` 提交决定或回执。
+- 审核前通过 `inputs_for` 展示待审材料。宿主用当前工作流版本调用 `review`，明确提交批准产物或拒绝理由。拒绝会阻塞依赖该审核的步骤，独立分支仍可继续。模型产物不符合声明时，宿主可以用 `repair_output` 提交有效产物，原始答复仍保存在子检查点。
+- 启用 `workflow-files` 后，`FileWorkflowStore` 与 `FileCheckpointStore` 共同保存进度和子检查点。跨进程恢复时复用同一对存储、计划、作用域和 Agent 绑定。宿主应为这对存储分配唯一工作流 ID，并为工作流保留以 `wf-` 开头的检查点 ID。如果子 Agent 已完成而产物保存失败，下一次推进会补交产物，无需重新调用 Agent。
+
+宿主负责调度、审核授权、模型与工具配置，以及归档这对存储。也可实现 `WorkflowStore` 和 `CheckpointStore` 对接应用自己的存储。
+
+## 带证据的长期记忆
+
+`memory::MemoryCatalog` 管理同一授权空间里的事实、偏好、决定与任务。宿主提供来源 ID、当前版本和能回查的位置，并提交候选记录。相同 `key` 对应一条当前结论，确认替换时需给出被替换记录的 ID。已替换的事实和决定可通过历史记录查询。
+
+```rust
+use cove_agent::memory::{
+    EvidenceRef, InMemoryStore, MemoryCatalog, MemoryChange, MemoryError,
+    MemoryKind, MemoryProposal, RecallQuery,
+};
+
+fn recall_custodian() -> Result<Option<String>, MemoryError> {
+    let store = InMemoryStore::default();
+    let catalog = MemoryCatalog::new(&store, "warehouse-a")?;
+    let initial = catalog.snapshot()?;
+    let snapshot = catalog.apply(initial.revision(), &[
+        MemoryChange::ObserveSource {
+            source: "handover".into(),
+            revision: Some("v17".into()),
+        },
+        MemoryChange::Propose(MemoryProposal {
+            id: "a42-handover-17".into(),
+            key: "inventory.a42.custodian".into(),
+            kind: MemoryKind::Fact,
+            title: "A42 保管点".into(),
+            content: "A42 由三号码头保管。".into(),
+            evidence: vec![EvidenceRef {
+                source: "handover".into(),
+                revision: "v17".into(),
+                locator: "entry:17".into(),
+            }],
+        }),
+        MemoryChange::Confirm { id: "a42-handover-17".into(), replaces: None },
+    ])?;
+    Ok(snapshot.recall(RecallQuery {
+        text: "A42 保管点",
+        kinds: &[MemoryKind::Fact],
+        limit: 4,
+        max_bytes: 4096,
+    }).first().map(|entry| entry.proposal.content.clone()))
+}
+```
+
+- `ObserveSource` 记录版本变化或删除。引用过期版本的已确认事实进入 `NeedsReview`。即便来源后来回滚到原版本，也要明确复核才能再次生效。
+- `recall` 在不可变快照上检索已确认的记录，按类型、条数及 JSON 字节预算返回证据。宿主可用 `recall_where` 在检索前附加记录级权限。下一轮可读取新快照，这一轮可以沿用已经选定的证据版本。
+- `apply` 一次提交一批变更。证据过期、结论冲突或写入版本过时，都会使 Cove 拒绝整批变更。使用 `InMemoryStore`、启用 `memory-files` 的本地文件后端，或实现 `MemoryStore` 接入数据库。文件后端使用按空间隔离的原子 JSON 快照，适用于支持文件锁的系统。
+
+宿主负责发现源资料的变更并传递给 Cove，也负责决定怎样生成候选、谁有权确认，以及允许 Agent 查阅哪个空间。来源可以是文件、数据库记录或业务事件。
+
+
 ## 本地资料检索
 
 `cove_agent::retrieval::SearchIndex` 可以为只读工具提供中英文关键词检索。它在进程内建立倒排索引，用 BM25 排序并优先匹配标题。应用负责准备资料、切分片段、处理更新和限定访问范围；索引返回片段序号，应用可以用它关联原文及出处。

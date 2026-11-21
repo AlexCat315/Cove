@@ -5,15 +5,18 @@
 //! UI hosts add their own tools on top.
 pub mod checkpoint;
 mod mcp;
+pub mod memory;
 #[cfg(feature = "openai-compatible")]
 pub mod openai_compatible;
 pub mod repetition;
 pub mod retrieval;
 mod schema;
 mod skills;
+mod snapshot_store;
 mod tool;
 pub mod transport;
 pub mod ui_tools;
+pub mod workflow;
 
 pub use mcp::{MAX_REQUEST_BYTES, McpServer, PROTOCOL_VERSIONS, ToolProvider, notification};
 pub use schema::{
@@ -35,3 +38,11 @@ pub type JSONSchemaType = JsonSchemaType;
 pub type JSONSchemaScalar = JsonSchemaScalar;
 pub type JSONSchemaViolation = JsonSchemaViolation;
 pub type JSONSchemaValidator = JsonSchemaValidator;
+
+fn portable_storage_id(id: &str) -> bool {
+    !id.is_empty()
+        && id.len() <= 128
+        && id
+            .bytes()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || b"-_".contains(&byte))
+}
