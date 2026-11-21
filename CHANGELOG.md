@@ -11,6 +11,8 @@
 - 修复普通左右方向键在有选区时越过选区边缘多移一格：现在与平台文本视图一致，先折叠到选区边缘。
 - 修复 `TextField` 画布身份缺口：`update_draw` 的身份只含文本 / 占位符 / 布局 / 行为 / 焦点，重算后仅 `code_editing`（匹配底纹、高亮开关、行号与缩进设置）或 `decoration` 变化时不重绘，留下过期底纹与字色。身份现在纳入装饰与 `TextFieldCodeEditing::draw_identity()`；闭包输出变化用此前闲置的 `syntax_revision` 声明。
 
+- `cargo xtask package windows` 现在把 MSVC C 运行库（`msvcp140*.dll`、`vcruntime140*.dll`、`concrt140.dll`）放进应用目录：默认动态链接 CRT 的产物换到没装 Visual C++ Redistributable 的机器也能直接启动。运行库从 `VCToolsRedistDir`、`VCToolsInstallDir` 或 vswhere 定位，找不到时报出可操作的错误，不再产出静默缺 DLL 的安装包。
+
 ## 0.3.0 — 2026-11-15
 
 Cove 0.3.0 将 SDK 迁移到 Rust 2024，使用 Cargo 构建和管理依赖。

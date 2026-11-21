@@ -33,7 +33,7 @@ cargo xtask devices android
 | 平台 | 产物 | 需要 |
 | --- | --- | --- |
 | macOS | `<Name>.app`，ad-hoc 签名；`--identity` 用开发者证书并开启 hardened runtime | Xcode 命令行工具 |
-| Windows | 可执行目录，`mt.exe` 嵌入 `Application.manifest` | Windows SDK |
+| Windows | 可执行目录，`mt.exe` 嵌入 `Application.manifest`，并带上 MSVC C 运行库 DLL（没有 Visual C++ Redistributable 的机器也能直接运行） | Windows SDK、Visual Studio C++ 工具 |
 | Linux | 可执行目录与 `.desktop` | — |
 | Android | `cdylib` → `libCoveAndroidApp.so`，Gradle 出 APK；Release 默认用调试密钥，`--keystore --key-alias --store-password-env --key-password-env` 指定发布密钥 | NDK r30（`ANDROID_NDK_HOME`）、Android SDK 36、JDK 21 |
 | iOS | Rust 二进制直接组成 `.app`，无需 Xcode 工程；真机需 `--identity` 与 `--provisioning-profile` | Xcode |
