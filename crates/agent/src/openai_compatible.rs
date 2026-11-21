@@ -1,6 +1,8 @@
 //! Blocking adapter for OpenAI-compatible Chat Completions servers.
 //! Construct it with the server's API base, e.g. `http://127.0.0.1:11434/v1`.
 
+mod stream;
+
 use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -71,8 +73,49 @@ impl ChatCompletionsModel {
         messages: &[AgentMessage],
         tools: &[AgentTool],
     ) -> Result<AgentReply, AgentError> {
+        let request = self.completion_request(messages, tools, false)?;
+        decode_reply(&fetch_json(&self.client, request, self.api_key.as_deref())?)
+    }
+
+    /// Reports visible text deltas as they arrive. Return false to stop reading.
+    /// The final reply preserves reasoning and tool calls for the next model turn.
+    pub fn complete_stream(
+        &self,
+        messages: &[AgentMessage],
+        tools: &[AgentTool],
+        mut on_text: impl FnMut(&str) -> bool,
+    ) -> Result<AgentReply, AgentError> {
+        let request = self.completion_request(messages, tools, true)?;
+        let response = fetch(
+            &self.client,
+            request,
+            self.api_key.as_deref(),
+            "text/event-stream",
+        )?;
+        if response
+            .header("Content-Type")
+            .is_some_and(|value| value.to_ascii_lowercase().starts_with("application/json"))
+        {
+            let reply = decode_reply(&read_json(response)?)?;
+            if let AgentReply::Assistant(message) = &reply
+                && !message.text.is_empty()
+                && !on_text(&message.text)
+            {
+                return Err(stream::cancelled());
+            }
+            return Ok(reply);
+        }
+        stream::read(response.into_body(), on_text)
+    }
+
+    fn completion_request(
+        &self,
+        messages: &[AgentMessage],
+        tools: &[AgentTool],
+        stream: bool,
+    ) -> Result<Request, AgentError> {
         let messages: Vec<Value> = messages.iter().map(encode_message).collect();
-        let mut body = json!({ "model": self.model, "messages": messages, "stream": false });
+        let mut body = json!({ "model": self.model, "messages": messages, "stream": stream });
         if !tools.is_empty() {
             body["tools"] = Value::Array(
                 tools
@@ -81,12 +124,11 @@ impl ChatCompletionsModel {
                     .collect(),
             );
         }
-        let request = Request::post(
+        Ok(Request::post(
             &self.endpoint,
             serde_json::to_vec(&body).map_err(|_| AgentError::InvalidResult)?,
         )
-        .header("Content-Type", "application/json");
-        decode_reply(&fetch_json(&self.client, request, self.api_key.as_deref())?)
+        .header("Content-Type", "application/json"))
     }
 }
 
@@ -145,7 +187,16 @@ fn fetch_json(
     request: Request,
     api_key: Option<&str>,
 ) -> Result<Value, AgentError> {
-    let mut request = request.header("Accept", "application/json");
+    read_json(fetch(client, request, api_key, "application/json")?)
+}
+
+fn fetch(
+    client: &Client,
+    request: Request,
+    api_key: Option<&str>,
+    accept: &str,
+) -> Result<cove_http::Response, AgentError> {
+    let mut request = request.header("Accept", accept);
     if let Some(key) = api_key {
         request = request.header("Authorization", format!("Bearer {key}"));
     }
@@ -156,6 +207,10 @@ fn fetch_json(
         // Some servers echo input and headers in error bodies.
         return Err(AgentError::HttpStatus(response.status));
     }
+    Ok(response)
+}
+
+fn read_json(response: cove_http::Response) -> Result<Value, AgentError> {
     let bytes = response.bytes(MAX_RESPONSE_BYTES).map_err(|error| {
         AgentError::Model(format!("Could not read the model response: {error}"))
     })?;
@@ -202,6 +257,14 @@ fn decode_reply(body: &Value) -> Result<AgentReply, AgentError> {
     if choice["finish_reason"].as_str() == Some("length") {
         return Err(AgentError::Model(
             "The model stopped before completing its response.".to_owned(),
+        ));
+    }
+    if matches!(
+        choice["finish_reason"].as_str(),
+        Some("content_filter" | "insufficient_system_resource" | "aborted")
+    ) {
+        return Err(AgentError::Model(
+            "The model server interrupted its response.".to_owned(),
         ));
     }
     let mut assistant = AgentMessage::text(

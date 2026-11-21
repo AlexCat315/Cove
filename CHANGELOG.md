@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+- `cove-agent` 的 OpenAI 兼容适配器支持流式接收正文，保留工具参数和推理字段供后续模型轮次使用。`revision::change_span` 提供 UTF-8 安全的修订范围。
+
 - `cove-agent` 新增可恢复的工作流。步骤支持多 Agent、依赖、产物校验和人工审核。启用 `workflow-files` 可跨进程恢复。
 
 - `cove-agent` 新增带出处的长期记忆，支持候选确认、来源变更复核、版本化存储和受预算约束的检索。

@@ -10,6 +10,7 @@ pub mod memory;
 pub mod openai_compatible;
 pub mod repetition;
 pub mod retrieval;
+pub mod revision;
 mod schema;
 mod skills;
 mod snapshot_store;

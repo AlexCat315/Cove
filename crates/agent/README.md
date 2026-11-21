@@ -35,6 +35,12 @@ fn run() -> Result<String, AgentError> {
 
 `AgentSession::run` 会等待模型及工具返回，桌面和移动应用应在工作线程运行。使用工具时，以 `AgentTool` 声明参数并注册执行器。应用自行决定工具可以访问的数据，以及何时由用户确认写入。模型请求和答复不进入 Cove 的网络录制。
 
+### 流式答复与修订差异
+
+`ChatCompletionsModel::complete_stream` 在当前线程读取响应，并通过回调交付可见正文的增量。回调返回 `false` 时停止读取。完成后的 `AgentReply` 保留模型的工具请求和推理字段。应用可在工作线程调用该方法，再把增量发给 UI 线程。
+
+`revision::change_span` 返回两版文本中变化部分的 UTF-8 字节范围，供修订核对或高亮使用。
+
 ## 持久化任务与恢复
 
 `checkpoint::AgentRunner` 使用已有的 `AgentSession`。每次 `advance` 处理一个模型回合、一个工具调用或一个审批状态变化，并保存检查点。应用可以用 `load` 读取进度，用 `drive` 运行到下一处待确认状态或任务结束，也可以在步骤之间暂停。任务完成后，用 `continue_with` 追加用户消息。调用可能阻塞，桌面和移动应用应在工作线程执行 `advance`。

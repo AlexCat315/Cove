@@ -14,6 +14,74 @@ use cove_http::recording;
 use serde_json::{Value, json};
 
 #[test]
+fn streaming_delivers_visible_text_before_the_server_finishes() {
+    let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+    let base = format!("http://{}/v1", listener.local_addr().unwrap());
+    let (received, before_finish) = mpsc::channel();
+    let server = std::thread::spawn(move || {
+        let (mut stream, _) = listener.accept().unwrap();
+        stream
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .unwrap();
+        let mut reader = BufReader::new(&mut stream);
+        let mut length = 0;
+        loop {
+            let mut line = String::new();
+            assert_ne!(reader.read_line(&mut line).unwrap(), 0);
+            if line == "\r\n" {
+                break;
+            }
+            if let Some((header, value)) = line.split_once(':')
+                && header.eq_ignore_ascii_case("content-length")
+            {
+                length = value.trim().parse().unwrap();
+            }
+        }
+        let mut body = vec![0; length];
+        reader.read_exact(&mut body).unwrap();
+        assert_eq!(
+            serde_json::from_slice::<Value>(&body).unwrap()["stream"],
+            true
+        );
+        let chunk = |delta: Value, finish: Option<&str>| {
+            format!(
+                "data: {}\n\n",
+                json!({"choices":[{"index":0,"delta":delta,"finish_reason":finish}]})
+            )
+        };
+        let start = chunk(
+            json!({"reasoning_content":"private","content":"她说"}),
+            None,
+        );
+        let rest = format!(
+            "{}{}data: [DONE]\n\n",
+            chunk(json!({"content":"。"}), None),
+            chunk(json!({}), Some("stop"))
+        );
+        write!(stream, "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{start}", start.len() + rest.len()).unwrap();
+        assert_eq!(
+            before_finish.recv_timeout(Duration::from_secs(5)).unwrap(),
+            "她说"
+        );
+        stream.write_all(rest.as_bytes()).unwrap();
+    });
+    let adapter = ChatCompletionsModel::new(&base, "test", None).unwrap();
+    let mut visible = String::new();
+    let reply = adapter
+        .complete_stream(&[AgentMessage::user("Continue")], &[], |text| {
+            if visible.is_empty() {
+                received.send(text.to_owned()).unwrap();
+            }
+            visible.push_str(text);
+            true
+        })
+        .unwrap();
+    assert_eq!(visible, "她说。");
+    assert!(matches!(reply, cove_agent::AgentReply::Assistant(message) if message.text == visible));
+    server.join().unwrap();
+}
+
+#[test]
 fn tool_round_trips_with_the_provider_without_recording_private_data() {
     let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
     let base = format!("http://{}/v1", listener.local_addr().unwrap());
