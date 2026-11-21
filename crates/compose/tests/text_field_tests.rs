@@ -1327,6 +1327,78 @@ fn drag_acquires_and_releases_capture() {
 }
 
 #[test]
+fn drag_uses_the_painted_rows_of_wrapped_paragraphs() {
+    with_rig(|rig| {
+        let first = "A long paragraph with a few words. ".repeat(6);
+        let second = "The next paragraph should stay untouched.";
+        rig.set(&format!("{first}\n\n{second}"));
+        let environment = test_text_environment(16.0, 20.0);
+        TextEnvironmentHolder::set_current(Some(environment.clone()));
+        let previous = PointerCaptureHolder::current();
+        PointerCaptureHolder::set_current(Some(Rc::new(PointerCapture::new())));
+        let padding = 8.0;
+        rig.install(
+            TextField::new("", rig.binding())
+                .layout(TextFieldLayout {
+                    max_visible_lines: 24,
+                    ..vertical()
+                })
+                .decoration(TextFieldDecoration {
+                    content_padding: Some(
+                        cove_ui_compose::primitives::text::text_field::TextFieldContentPadding::new(
+                            padding, padding,
+                        ),
+                    ),
+                    ..Default::default()
+                }),
+        );
+        rig.graph.compute_layout(200.0, 540.0);
+        let node = rig.field();
+        draw(&node);
+        use cove_ui_compose::primitives::text::{
+            text_document_layout::TextDocumentLayout,
+            text_field::text_field_layout_engine::DOCUMENT_LAYOUT_KEY,
+        };
+        let document = node
+            .attachment::<Rc<RefCell<TextDocumentLayout>>>(DOCUMENT_LAYOUT_KEY)
+            .unwrap();
+        let index = first.len() + 2;
+        let row = document.borrow_mut().caret(index, false, &environment).1;
+        assert!(row > 2, "the first paragraph must wrap");
+        let frame = node.absolute_origin();
+        let line_height = document.borrow().geometry().line_height;
+        let x = frame.x + 2.0;
+        let first_y = frame.y + padding + line_height / 2.0;
+        let second_y = first_y + row as f32 * line_height;
+        let handlers = rig.handlers(&node);
+        let pointer = handlers.pointer.unwrap();
+        let motion = handlers.motion.unwrap();
+        pointer(
+            &press(x, second_y, 1),
+            PointerPhase::Down,
+            EventPhase::Target,
+        );
+        motion(
+            &MouseMotionEvent {
+                x,
+                y: first_y,
+                delta_x: 0.0,
+                delta_y: first_y - second_y,
+                kind: Default::default(),
+            },
+            EventPhase::Target,
+        );
+        pointer(&press(x, first_y, 1), PointerPhase::Up, EventPhase::Target);
+
+        let state = state_of(&node).unwrap();
+        assert_eq!(state.borrow().selection_range(), Some((0, index)));
+        handlers.text.unwrap()("Replacement\n", EventPhase::Target);
+        assert_eq!(rig.text(), format!("Replacement\n{second}"));
+        PointerCaptureHolder::set_current(previous);
+    });
+}
+
+#[test]
 fn motion_ignored_without_drag() {
     with_rig(|rig| {
         rig.set("abc");

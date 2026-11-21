@@ -40,7 +40,11 @@ impl TextFieldIndentSkip {
 
 impl PartialEq for TextFieldIndentSkip {
     fn eq(&self, other: &Self) -> bool {
-        self.0.is_none() && other.0.is_none()
+        match (self.0, other.0) {
+            (None, None) => true,
+            (Some(left), Some(right)) => std::ptr::fn_addr_eq(left, right),
+            _ => false,
+        }
     }
 }
 

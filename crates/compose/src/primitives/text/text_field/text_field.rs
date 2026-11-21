@@ -1207,7 +1207,7 @@ fn update_gutter_controls(node: &Node, field: &TextField) {
 /// height.
 #[derive(Clone, PartialEq)]
 struct MeasureInputs {
-    text: String,
+    text: TextBuffer,
     placeholder: String,
     axis: TextFieldAxis,
     wraps_lines: bool,
@@ -1225,7 +1225,7 @@ struct MeasureInputs {
 /// field scrolls.
 fn install_measure(layout: &LayoutNode, field: TextField) {
     let inputs = MeasureInputs {
-        text: field.text.get().string_value(),
+        text: field.text.get(),
         placeholder: field.placeholder.clone(),
         axis: field.layout.axis,
         wraps_lines: field.layout.wraps_lines,
@@ -1615,7 +1615,8 @@ fn committed_input_area(
         if vertical { width } else { f32::INFINITY },
         rendered.shows_placeholder,
     );
-    let mut document = TextDocumentLayout::new(rendered.buffer, geometry);
+    let document = document_layout(node, rendered.buffer, geometry);
+    let mut document = document.borrow_mut();
     let (caret_x, row) = document.caret(
         rendered.cursor_index,
         selection.line_end_affinity && !rendered.is_composing,
@@ -1624,7 +1625,12 @@ fn committed_input_area(
     let height = (node.frame().height - 2.0 * field.vertical_inset(line_height)).max(line_height);
     state.scroll.visible_height = height;
     state.scroll.content_height = document.index().row_count() as f32 * line_height;
-    state.scroll.max_y = (state.scroll.content_height - height).max(0.0);
+    let extra = if field.layout.typewriter_scrolling {
+        height / 2.0
+    } else {
+        0.0
+    };
+    state.scroll.max_y = (state.scroll.content_height + extra - height).max(0.0);
     state.scroll.horizontal.viewport_width = width;
     state.scroll.horizontal.leading_inset = inset + addons.leading();
     if state.scroll.needs_caret_reveal {
@@ -1635,7 +1641,10 @@ fn committed_input_area(
             state.scroll.horizontal.offset = caret_x.max(0.0);
         }
         let top = row as f32 * line_height;
-        if field.layout.typewriter_scrolling {
+        if field.layout.typewriter_scrolling
+            && !state.is_dragging
+            && state.selection_range().is_none()
+        {
             // Keep the caret row in the middle of the viewport. At the very
             // start and end the clamp leaves the document flush with the edge.
             state.scroll.offset_y =
@@ -1659,6 +1668,30 @@ fn committed_input_area(
         height: line_height,
         cursor_x: (caret_x - state.scroll.horizontal.offset).clamp(0.0, width),
     })
+}
+
+/// Keep one row index for paint, hit testing, caret moves and the IME anchor.
+fn document_layout(
+    node: &Node,
+    buffer: TextBuffer,
+    geometry: crate::primitives::text::text_document_layout::TextLineGeometry,
+) -> Rc<RefCell<TextDocumentLayout>> {
+    let document = match node.attachment::<Rc<RefCell<TextDocumentLayout>>>(DOCUMENT_LAYOUT_KEY) {
+        Some(document) => {
+            document.borrow_mut().update(buffer, geometry);
+            document
+        }
+        None => {
+            let document = Rc::new(RefCell::new(TextDocumentLayout::new(buffer, geometry)));
+            node.set_attachment(DOCUMENT_LAYOUT_KEY, document.clone());
+            document
+        }
+    };
+    let hidden_lines = node
+        .first_resource::<crate::primitives::text::code::TextGutterSession>()
+        .map_or_else(Vec::new, |gutter| gutter.folds().hidden_lines());
+    document.borrow_mut().set_hidden_lines(hidden_lines);
+    document
 }
 
 fn pointer_character(
@@ -1712,11 +1745,12 @@ fn pointer_character(
         },
         false,
     );
-    let mut document = TextDocumentLayout::new(rendered.buffer, geometry);
+    let document = document_layout(node, rendered.buffer, geometry);
+    let mut document = document.borrow_mut();
     let origin = node.absolute_origin();
-    let x = point.x - origin.x - leading + state.scroll.horizontal.offset;
-    let row = ((point.y - origin.y - field.vertical_inset(line_height) + state.scroll.offset_y)
-        .max(0.0)
+    let painted_offset = node.content_offset();
+    let x = point.x - origin.x - leading + painted_offset.x;
+    let row = ((point.y - origin.y - field.vertical_inset(line_height) + painted_offset.y).max(0.0)
         / line_height.max(1.0)) as usize;
     Some(
         document
@@ -2482,7 +2516,7 @@ fn install_interaction(
 /// Displayed-row geometry for caret commands that step by row instead of by
 /// logical line: soft-wrapped fields, Home/End affinity and page moves.
 struct NavigationContext {
-    document: TextDocumentLayout,
+    document: Rc<RefCell<TextDocumentLayout>>,
     environment: TextEnvironment,
     line_height: f32,
     vertical_inset: f32,
@@ -2524,7 +2558,7 @@ fn navigation_context(
         state.buffer.is_empty(),
     );
     Some(NavigationContext {
-        document: TextDocumentLayout::new(state.buffer.clone(), geometry),
+        document: document_layout(node, state.buffer.clone(), geometry),
         environment,
         line_height,
         vertical_inset: field.vertical_inset(line_height),
@@ -2581,7 +2615,7 @@ fn refresh_scroll_metrics(node: &Node, field: &TextField, state: &Rc<RefCell<Fie
     let Some(context) = context else {
         return;
     };
-    let rows = context.document.index().row_count() as f32;
+    let rows = context.document.borrow().index().row_count() as f32;
     let visible = (node.frame().height - 2.0 * context.vertical_inset).max(context.line_height);
     let content = rows * context.line_height;
     let mut state = state.borrow_mut();
@@ -2622,11 +2656,22 @@ fn apply_key(
     let scancode = event.scancode;
     let caret = state.selection.cursor_index;
     let preferred_x = state.selection.preferred_caret_x();
-    let mut context = if vertical {
-        navigation_context(owner, field, state)
-    } else {
-        None
-    };
+    let uses_rows = matches!(
+        scancode,
+        crate::Scancode::ARROW_UP
+            | crate::Scancode::ARROW_DOWN
+            | crate::Scancode::PAGE_UP
+            | crate::Scancode::PAGE_DOWN
+            | crate::Scancode::HOME
+            | crate::Scancode::END
+    ) || command
+        && matches!(
+            scancode,
+            crate::Scancode::ARROW_LEFT | crate::Scancode::ARROW_RIGHT
+        );
+    let mut context = (vertical && uses_rows)
+        .then(|| navigation_context(owner, field, state))
+        .flatten();
 
     match scancode {
         // A code field consumes Tab to indent; every other field yields it to
@@ -2681,7 +2726,7 @@ fn apply_key(
                 // Command-Up/Down own the document bounds.
                 match context.as_mut() {
                     Some(ctx) => {
-                        let document = &mut ctx.document;
+                        let document = &mut *ctx.document.borrow_mut();
                         let environment = &ctx.environment;
                         line_boundary(
                             &state.buffer,
@@ -2735,7 +2780,7 @@ fn apply_key(
             }
             let moved = match context.as_mut() {
                 Some(ctx) => {
-                    let document = &mut ctx.document;
+                    let document = &mut *ctx.document.borrow_mut();
                     let environment = &ctx.environment;
                     move_cursor_vertically(
                         &state.buffer,
@@ -2776,7 +2821,7 @@ fn apply_key(
                 Some(ctx) => {
                     let line_height = ctx.line_height;
                     let vertical_inset = ctx.vertical_inset;
-                    let document = &mut ctx.document;
+                    let document = &mut *ctx.document.borrow_mut();
                     let environment = &ctx.environment;
                     move_cursor_by_page(
                         &state.buffer,
@@ -2828,7 +2873,7 @@ fn apply_key(
             }
             let target = match context.as_mut() {
                 Some(ctx) => {
-                    let document = &mut ctx.document;
+                    let document = &mut *ctx.document.borrow_mut();
                     let environment = &ctx.environment;
                     line_boundary(
                         &state.buffer,
@@ -3094,11 +3139,8 @@ fn render(
         },
         render_state.shows_placeholder,
     );
-    let mut document = TextDocumentLayout::new(render_state.buffer.clone(), geometry.clone());
-    if let Some(gutter) = node.first_resource::<crate::primitives::text::code::TextGutterSession>()
-    {
-        document.set_hidden_lines(gutter.folds().hidden_lines());
-    }
+    let shared_document = document_layout(node, render_state.buffer.clone(), geometry.clone());
+    let mut document = shared_document.borrow_mut();
     let vertical_inset = field.vertical_inset(line_height);
     state.scroll.visible_height = (frame.height - vertical_inset * 2.0).max(line_height);
     update_scroll(&mut state.scroll, &document, line_height);
@@ -3121,7 +3163,10 @@ fn render(
             &environment,
         );
         let top = caret_row as f32 * line_height;
-        if field.layout.typewriter_scrolling {
+        if field.layout.typewriter_scrolling
+            && !state.is_dragging
+            && state.selection_range().is_none()
+        {
             state.scroll.offset_y = (top + line_height / 2.0 - state.scroll.visible_height / 2.0)
                 .clamp(0.0, state.scroll.max_y);
         } else {
@@ -3507,11 +3552,7 @@ fn render(
         text_color,
         &theme,
     );
-    let shared_document = Rc::new(RefCell::new(document));
-    node.set_attachment(DOCUMENT_LAYOUT_KEY, shared_document.clone());
-    // The last measure pass, keyed by everything that changes its glyphs. A
-    // later pass reuses it instead of reshaping, and observers can read what
-    // the field actually shaped with (the authored tracking included).
+    // Keep the painted row window available to inspection and hit testing.
     node.set_attachment(
         RENDER_CACHE_KEY,
         RenderCacheEntry {
@@ -3519,14 +3560,14 @@ fn render(
                 root: first_row,
                 visible_first_row: first_row,
                 visible_row_count: row_count,
-                total_rows: shared_document.borrow().index().row_count(),
+                total_rows: document.index().row_count(),
                 font: font.clone(),
                 line_height,
                 letter_spacing: token.letter_spacing,
                 atlas: environment.atlas_texture_id as u64,
                 available_text_width: available_width,
                 secure: field.behavior.secure,
-                hidden_lines: shared_document.borrow().hidden_lines().to_vec(),
+                hidden_lines: document.hidden_lines().to_vec(),
             },
             layout,
             document: shared_document.clone(),
@@ -3595,7 +3636,10 @@ fn draw_range(
         let overlaps_text = lower < line_end && upper > line_start;
         let selects_line_break = lower <= line_end && upper > line_end && line_break_at(line_end);
         let x_low = super::text_field_layout_engine::row_x_at_byte(line, lower.max(line_start));
-        let x_high = super::text_field_layout_engine::row_x_at_byte(line, upper.min(line_end));
+        let mut x_high = super::text_field_layout_engine::row_x_at_byte(line, upper.min(line_end));
+        if selects_line_break {
+            x_high += (line_height * 0.25).max(2.0);
+        }
         if overlaps_text || selects_line_break {
             crate::primitives::text::selection_input::paint_selection(
                 list,
