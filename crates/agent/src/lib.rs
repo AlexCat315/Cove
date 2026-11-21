@@ -3,6 +3,7 @@
 //!
 //! The optional `openai-compatible` feature adds a model adapter over Cove HTTP.
 //! UI hosts add their own tools on top.
+pub mod checkpoint;
 mod mcp;
 #[cfg(feature = "openai-compatible")]
 pub mod openai_compatible;
@@ -21,9 +22,10 @@ pub use schema::{
 pub use skills::{AgentSkill, AgentSkillLibrary};
 pub use tool::{
     AgentError, AgentImage, AgentMessage, AgentModel, AgentReply, AgentRole, AgentRun,
-    AgentSession, AgentTool, AgentToolCall, AgentToolResult, AgentToolbox,
-    MAX_TOOL_DESCRIPTION_BYTES, MAX_TOOL_IMAGE_BYTES, MAX_TOOL_INPUT_BYTES, MAX_TOOL_NAME_BYTES,
-    MAX_TOOL_RESULT_BYTES, MAX_TOOLS, SessionApiFormat, ToolExecutor,
+    AgentSession, AgentTool, AgentToolCall, AgentToolResult, AgentToolbox, CheckpointToolKey,
+    ContextualToolExecutor, MAX_TOOL_DESCRIPTION_BYTES, MAX_TOOL_IMAGE_BYTES, MAX_TOOL_INPUT_BYTES,
+    MAX_TOOL_NAME_BYTES, MAX_TOOL_RESULT_BYTES, MAX_TOOLS, SessionApiFormat, ToolExecutionContext,
+    ToolExecutor,
 };
 
 // Convenience aliases so call sites can use either the `JSON`-prefixed spelling

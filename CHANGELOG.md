@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+- `cove-agent` 新增通用任务检查点，通过 `AgentRunner` 逐步运行、持久化和恢复。文件后端可选，写工具支持审批和中断结果核对。
+
 - 修复 `TextField` 的 `on_caret_change` 死回调：附件只写不读，回调从不触发。现在输入、粘贴、指针选择、撤销 / 重做、导航与编辑请求等所有提交点都发布光标与选区。
 - 新增 `TextFieldEditRequest`：程序化替换在字段自身的撤销括号内应用，外部改写绑定文本不再清空撤销 / 重做栈；请求带光标与选区锚点落点。
 - `TextFieldNavigationRequest` 新增 `caret_request_anchor`（导航带选区）与 `caret_request_focus`（默认 true；置 false 时只移光标不抢焦点，供查找栏一类保持键盘的外壳使用）。

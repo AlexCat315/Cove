@@ -355,8 +355,10 @@ name = "cove-agent"
 version = "0.3.2"
 dependencies = [
  "cove-http",
+ "cove-system",
  "serde",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]

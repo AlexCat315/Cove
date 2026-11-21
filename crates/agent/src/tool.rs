@@ -161,6 +161,29 @@ pub const MAX_TOOL_DESCRIPTION_BYTES: usize = 16_384;
 pub type ToolExecutor =
     Arc<dyn Fn(&str, &Value) -> Result<AgentToolResult, AgentError> + Send + Sync>;
 
+/// Stable identity of a tool call within a persisted run. A host can use it
+/// to look up an external receipt or implement idempotency. Provider call IDs
+/// can repeat across turns, so the key uses the call's transcript position.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CheckpointToolKey<'a> {
+    pub scope: &'a str,
+    pub run_id: &'a str,
+    pub assistant_message: usize,
+    pub call_index: usize,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct ToolExecutionContext<'a> {
+    pub call_id: Option<&'a str>,
+    pub checkpoint: Option<CheckpointToolKey<'a>>,
+}
+
+pub type ContextualToolExecutor = Arc<
+    dyn Fn(&str, &Value, ToolExecutionContext<'_>) -> Result<AgentToolResult, AgentError>
+        + Send
+        + Sync,
+>;
+
 /// Model adapter for one turn of [`AgentSession`].
 pub type AgentModel =
     Arc<dyn Fn(&[AgentMessage], &[AgentTool]) -> Result<AgentReply, AgentError> + Send + Sync>;
@@ -169,11 +192,19 @@ pub type AgentModel =
 #[derive(Clone)]
 pub struct AgentToolbox {
     pub tools: Vec<AgentTool>,
-    executor: ToolExecutor,
+    executor: ContextualToolExecutor,
 }
 
 impl AgentToolbox {
     pub fn new(tools: Vec<AgentTool>, executor: ToolExecutor) -> Result<Self, AgentError> {
+        Self::with_context(tools, Arc::new(move |name, input, _| executor(name, input)))
+    }
+
+    /// Like `new`, with access to the caller and checkpoint identity when available.
+    pub fn with_context(
+        tools: Vec<AgentTool>,
+        executor: ContextualToolExecutor,
+    ) -> Result<Self, AgentError> {
         let mut names = std::collections::BTreeSet::new();
         if tools.len() > MAX_TOOLS {
             return Err(AgentError::InvalidConfiguration(
@@ -196,6 +227,26 @@ impl AgentToolbox {
     }
 
     pub fn execute(&self, name: &str, input: &Value) -> Result<AgentToolResult, AgentError> {
+        self.execute_contextual(name, input, ToolExecutionContext::default())
+    }
+
+    fn execute_contextual(
+        &self,
+        name: &str,
+        input: &Value,
+        context: ToolExecutionContext<'_>,
+    ) -> Result<AgentToolResult, AgentError> {
+        self.validate_call(name, input)?;
+        let result = (self.executor)(name, input, context)?;
+        validate_tool_result(&result)?;
+        Ok(result)
+    }
+
+    pub(crate) fn validate_call(
+        &self,
+        name: &str,
+        input: &Value,
+    ) -> Result<&AgentTool, AgentError> {
         let Some(tool) = self.tools.iter().find(|tool| tool.name == name) else {
             return Err(AgentError::UnknownTool(name.to_string()));
         };
@@ -207,32 +258,35 @@ impl AgentToolbox {
         }
         JsonSchemaValidator::validate(input, &tool.schema)
             .map_err(|violation| AgentError::InvalidConfiguration(violation.to_string()))?;
-        let result = (self.executor)(name, input)?;
-        if result.json.len() > MAX_TOOL_RESULT_BYTES
-            || serde_json::from_slice::<Value>(&result.json).is_err()
-            || result.images.len() > 4
-            || result
-                .images
-                .iter()
-                .map(|image| image.data.len())
-                .sum::<usize>()
-                > MAX_TOOL_IMAGE_BYTES
-            || result.images.iter().any(|image| {
-                image.data.is_empty()
-                    || !matches!(
-                        image.mime_type.as_str(),
-                        "image/jpeg" | "image/png" | "image/webp"
-                    )
-                    || image
-                        .data
-                        .bytes()
-                        .any(|byte| !byte.is_ascii_alphanumeric() && !b"+/=".contains(&byte))
-            })
-        {
-            return Err(AgentError::InvalidResult);
-        }
-        Ok(result)
+        Ok(tool)
     }
+}
+
+pub(crate) fn validate_tool_result(result: &AgentToolResult) -> Result<(), AgentError> {
+    if result.json.len() > MAX_TOOL_RESULT_BYTES
+        || serde_json::from_slice::<Value>(&result.json).is_err()
+        || result.images.len() > 4
+        || result
+            .images
+            .iter()
+            .map(|image| image.data.len())
+            .sum::<usize>()
+            > MAX_TOOL_IMAGE_BYTES
+        || result.images.iter().any(|image| {
+            image.data.is_empty()
+                || !matches!(
+                    image.mime_type.as_str(),
+                    "image/jpeg" | "image/png" | "image/webp"
+                )
+                || image
+                    .data
+                    .bytes()
+                    .any(|byte| !byte.is_ascii_alphanumeric() && !b"+/=".contains(&byte))
+        })
+    {
+        return Err(AgentError::InvalidResult);
+    }
+    Ok(())
 }
 
 impl std::fmt::Debug for AgentToolbox {
@@ -339,47 +393,11 @@ impl AgentSession {
     }
 
     pub fn run(&self, input: Vec<AgentMessage>) -> Result<AgentRun, AgentError> {
-        let mut messages = input;
-        if !self.instructions.is_empty() {
-            messages.insert(
-                0,
-                AgentMessage::text(AgentRole::System, self.instructions.clone()),
-            );
-        }
+        let mut messages = self.prepare(input);
         for round in 0..=self.maximum_tool_rounds {
-            if messages.len() > 256
-                || messages
-                    .iter()
-                    .map(|message| {
-                        message.text.len()
-                            + message.reasoning_content.as_ref().map_or(0, String::len)
-                    })
-                    .sum::<usize>()
-                    > 1_048_576
-            {
-                return Err(AgentError::InvalidConfiguration(
-                    "Conversation exceeds the message or byte limit.".into(),
-                ));
-            }
-            let mut assistant = match (self.model)(&messages, &self.toolbox.tools)? {
-                AgentReply::Answer(text) => AgentMessage::text(AgentRole::Assistant, text),
-                AgentReply::Tools(calls) if !calls.is_empty() => AgentMessage {
-                    calls,
-                    ..AgentMessage::new(AgentRole::Assistant)
-                },
-                AgentReply::Tools(_) => return Err(AgentError::InvalidResult),
-                AgentReply::Assistant(message) => message,
-            };
-            if assistant.role != AgentRole::Assistant
-                || assistant.text.len() > 262_144
-                || assistant
-                    .reasoning_content
-                    .as_ref()
-                    .is_some_and(|text| text.len() > 524_288)
-            {
-                return Err(AgentError::InvalidResult);
-            }
-            if assistant.calls.is_empty() {
+            let assistant = self.request_model(&messages, round, self.maximum_tool_rounds)?;
+            let calls = assistant.calls.clone();
+            if calls.is_empty() {
                 let answer = assistant.text.clone();
                 messages.push(assistant);
                 return Ok(AgentRun {
@@ -388,10 +406,71 @@ impl AgentSession {
                     tool_rounds: round,
                 });
             }
-            if round == self.maximum_tool_rounds {
+            messages.push(assistant);
+            for call in calls {
+                let result = self.execute_call(&call, None);
+                messages.push(tool_message(call.id, result));
+            }
+        }
+        Err(AgentError::StepLimit)
+    }
+
+    pub(crate) fn prepare(&self, mut messages: Vec<AgentMessage>) -> Vec<AgentMessage> {
+        if !self.instructions.is_empty() {
+            messages.insert(
+                0,
+                AgentMessage::text(AgentRole::System, self.instructions.clone()),
+            );
+        }
+        messages
+    }
+
+    pub(crate) fn maximum_tool_rounds(&self) -> usize {
+        self.maximum_tool_rounds
+    }
+
+    pub(crate) fn request_model(
+        &self,
+        messages: &[AgentMessage],
+        round: usize,
+        maximum_tool_rounds: usize,
+    ) -> Result<AgentMessage, AgentError> {
+        if messages.len() > 256
+            || messages
+                .iter()
+                .map(|message| {
+                    message.text.len() + message.reasoning_content.as_ref().map_or(0, String::len)
+                })
+                .sum::<usize>()
+                > 1_048_576
+        {
+            return Err(AgentError::InvalidConfiguration(
+                "Conversation exceeds the message or byte limit.".into(),
+            ));
+        }
+        let assistant = match (self.model)(messages, &self.toolbox.tools)? {
+            AgentReply::Answer(text) => AgentMessage::text(AgentRole::Assistant, text),
+            AgentReply::Tools(calls) if !calls.is_empty() => AgentMessage {
+                calls,
+                ..AgentMessage::new(AgentRole::Assistant)
+            },
+            AgentReply::Tools(_) => return Err(AgentError::InvalidResult),
+            AgentReply::Assistant(message) => message,
+        };
+        if assistant.role != AgentRole::Assistant
+            || assistant.text.len() > 262_144
+            || assistant
+                .reasoning_content
+                .as_ref()
+                .is_some_and(|text| text.len() > 524_288)
+        {
+            return Err(AgentError::InvalidResult);
+        }
+        if !assistant.calls.is_empty() {
+            if round >= maximum_tool_rounds {
                 return Err(AgentError::StepLimit);
             }
-            let calls = std::mem::take(&mut assistant.calls);
+            let calls = &assistant.calls;
             let mut ids = std::collections::BTreeSet::new();
             if calls.len() > 16
                 || !calls
@@ -403,28 +482,48 @@ impl AgentSession {
                     "Model returned invalid tool calls.".into(),
                 ));
             }
-            assistant.calls = calls.clone();
-            messages.push(assistant);
-            for call in calls {
-                let result = self.toolbox.execute(&call.name, &call.arguments);
-                let (text, is_error) = match result {
-                    Ok(result) => (
-                        String::from_utf8_lossy(&result.json).to_string(),
-                        result.is_error,
-                    ),
-                    Err(error) => (
-                        serde_json::json!({ "error": error.message() }).to_string(),
-                        true,
-                    ),
-                };
-                let mut message = AgentMessage::text(AgentRole::Tool, text);
-                message.result_for = Some(call.id);
-                message.is_error = is_error;
-                messages.push(message);
-            }
         }
-        Err(AgentError::StepLimit)
+        Ok(assistant)
     }
+
+    pub(crate) fn validate_call(&self, call: &AgentToolCall) -> Result<&AgentTool, AgentError> {
+        self.toolbox.validate_call(&call.name, &call.arguments)
+    }
+
+    pub(crate) fn execute_call(
+        &self,
+        call: &AgentToolCall,
+        checkpoint: Option<CheckpointToolKey<'_>>,
+    ) -> Result<AgentToolResult, AgentError> {
+        self.toolbox.execute_contextual(
+            &call.name,
+            &call.arguments,
+            ToolExecutionContext {
+                call_id: Some(&call.id),
+                checkpoint,
+            },
+        )
+    }
+}
+
+pub(crate) fn tool_message(
+    id: String,
+    result: Result<AgentToolResult, AgentError>,
+) -> AgentMessage {
+    let (text, is_error) = match result {
+        Ok(result) => (
+            String::from_utf8_lossy(&result.json).into_owned(),
+            result.is_error,
+        ),
+        Err(error) => (
+            serde_json::json!({ "error": error.message() }).to_string(),
+            true,
+        ),
+    };
+    let mut message = AgentMessage::text(AgentRole::Tool, text);
+    message.result_for = Some(id);
+    message.is_error = is_error;
+    message
 }
 
 #[cfg(test)]
