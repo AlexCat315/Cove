@@ -26,54 +26,40 @@ pub struct ChatCompletionsModel {
 
 impl ChatCompletionsModel {
     pub fn new(base_url: &str, model: &str, api_key: Option<&str>) -> Result<Self, AgentError> {
-        let base_url = base_url.trim().trim_end_matches('/');
-        let invalid_url = || {
-            AgentError::InvalidConfiguration(
-                "Enter an HTTP(S) API base URL without credentials, query, or fragment.".to_owned(),
-            )
-        };
-        let url = Url::parse(base_url).map_err(|_| invalid_url())?;
-        if base_url.contains(['?', '#', '\\']) {
-            return Err(invalid_url());
-        }
-        if !url.secure
-            && url.host != "localhost"
-            && !url.host.parse::<IpAddr>().is_ok_and(|ip| ip.is_loopback())
-        {
-            return Err(AgentError::InvalidConfiguration(
-                "Use HTTPS for model servers outside this device.".to_owned(),
-            ));
-        }
+        let base_url = api_base(base_url)?;
         let model = model.trim();
         if model.is_empty() || model.len() > 512 || model.chars().any(char::is_control) {
             return Err(AgentError::InvalidConfiguration(
                 "Enter a model name.".to_owned(),
             ));
         }
-        let api_key = api_key.map(str::trim).filter(|key| !key.is_empty());
-        if api_key
-            .is_some_and(|key| key.len() > 8192 || !key.bytes().all(|byte| byte.is_ascii_graphic()))
-        {
-            return Err(AgentError::InvalidConfiguration(
-                "The API key contains invalid characters.".to_owned(),
-            ));
-        }
-        let endpoint = if url.path.ends_with("/chat/completions") {
-            base_url.to_owned()
-        } else {
-            format!("{base_url}/chat/completions")
-        };
-        let client = Client::new(ClientConfig {
-            timeout: Duration::from_secs(120),
-            max_redirects: 0,
-            user_agent: "Cove-Agent/1".to_owned(),
-        });
         Ok(Self {
-            client,
-            endpoint,
+            client: client(Duration::from_secs(120)),
+            endpoint: format!("{base_url}/chat/completions"),
             model: model.to_owned(),
-            api_key: api_key.map(str::to_owned),
+            api_key: validated_key(api_key)?.map(str::to_owned),
         })
+    }
+
+    /// Lists model IDs advertised by an OpenAI-compatible server.
+    /// Some servers omit this endpoint. Callers can still configure a model manually.
+    pub fn list_models(base_url: &str, api_key: Option<&str>) -> Result<Vec<String>, AgentError> {
+        let base = api_base(base_url)?;
+        let body = fetch_json(
+            &client(Duration::from_secs(20)),
+            Request::get(format!("{base}/models")),
+            validated_key(api_key)?,
+        )?;
+        let data = body["data"].as_array().ok_or(AgentError::InvalidResult)?;
+        let models = data
+            .iter()
+            .filter_map(|entry| entry["id"].as_str())
+            .filter(|id| {
+                !id.trim().is_empty() && id.len() <= 512 && !id.chars().any(char::is_control)
+            })
+            .map(str::to_owned)
+            .collect::<std::collections::BTreeSet<_>>();
+        Ok(models.into_iter().collect())
     }
 
     pub fn into_agent_model(self) -> AgentModel {
@@ -95,28 +81,85 @@ impl ChatCompletionsModel {
                     .collect(),
             );
         }
-        let mut request = Request::post(
+        let request = Request::post(
             &self.endpoint,
             serde_json::to_vec(&body).map_err(|_| AgentError::InvalidResult)?,
         )
-        .header("Content-Type", "application/json")
-        .header("Accept", "application/json");
-        if let Some(key) = &self.api_key {
-            request = request.header("Authorization", format!("Bearer {key}"));
-        }
-        let response = self.client.send_unrecorded(request).map_err(|error| {
-            AgentError::Model(format!("Could not reach the model server: {error}"))
-        })?;
-        if !response.is_success() {
-            // Some servers echo input and headers in error bodies.
-            return Err(AgentError::HttpStatus(response.status));
-        }
-        let bytes = response.bytes(MAX_RESPONSE_BYTES).map_err(|error| {
-            AgentError::Model(format!("Could not read the model response: {error}"))
-        })?;
-        let body: Value = serde_json::from_slice(&bytes).map_err(|_| AgentError::InvalidResult)?;
-        decode_reply(&body)
+        .header("Content-Type", "application/json");
+        decode_reply(&fetch_json(&self.client, request, self.api_key.as_deref())?)
     }
+}
+
+/// Validates the API base and accepts a complete Chat Completions URL as input.
+/// The resulting base also identifies the scope of credentials for this API.
+pub fn api_base(base_url: &str) -> Result<&str, AgentError> {
+    let base_url = base_url.trim().trim_end_matches('/');
+    let invalid_url = || {
+        AgentError::InvalidConfiguration(
+            "Enter an HTTP(S) API base URL without credentials, query, or fragment.".to_owned(),
+        )
+    };
+    let url = Url::parse(base_url).map_err(|_| invalid_url())?;
+    if base_url.contains(['?', '#', '\\']) {
+        return Err(invalid_url());
+    }
+    if !url.secure
+        && url.host != "localhost"
+        && !url.host.parse::<IpAddr>().is_ok_and(|ip| ip.is_loopback())
+    {
+        return Err(AgentError::InvalidConfiguration(
+            "Use HTTPS for model servers outside this device.".to_owned(),
+        ));
+    }
+    Ok(if url.path.ends_with("/chat/completions") {
+        base_url
+            .strip_suffix("/chat/completions")
+            .unwrap_or(base_url)
+    } else {
+        base_url
+    })
+}
+
+fn validated_key(api_key: Option<&str>) -> Result<Option<&str>, AgentError> {
+    let api_key = api_key.map(str::trim).filter(|key| !key.is_empty());
+    if api_key
+        .is_some_and(|key| key.len() > 8192 || !key.bytes().all(|byte| byte.is_ascii_graphic()))
+    {
+        return Err(AgentError::InvalidConfiguration(
+            "The API key contains invalid characters.".to_owned(),
+        ));
+    }
+    Ok(api_key)
+}
+
+fn client(timeout: Duration) -> Client {
+    Client::new(ClientConfig {
+        timeout,
+        max_redirects: 0,
+        user_agent: "Cove-Agent/1".to_owned(),
+    })
+}
+
+fn fetch_json(
+    client: &Client,
+    request: Request,
+    api_key: Option<&str>,
+) -> Result<Value, AgentError> {
+    let mut request = request.header("Accept", "application/json");
+    if let Some(key) = api_key {
+        request = request.header("Authorization", format!("Bearer {key}"));
+    }
+    let response = client
+        .send_unrecorded(request)
+        .map_err(|error| AgentError::Model(format!("Could not reach the model server: {error}")))?;
+    if !response.is_success() {
+        // Some servers echo input and headers in error bodies.
+        return Err(AgentError::HttpStatus(response.status));
+    }
+    let bytes = response.bytes(MAX_RESPONSE_BYTES).map_err(|error| {
+        AgentError::Model(format!("Could not read the model response: {error}"))
+    })?;
+    serde_json::from_slice(&bytes).map_err(|_| AgentError::InvalidResult)
 }
 
 fn encode_message(message: &AgentMessage) -> Value {

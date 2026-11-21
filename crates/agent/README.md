@@ -4,6 +4,8 @@
 
 启用 Cargo 特性 `openai-compatible` 后，可用 `ChatCompletionsModel` 连接支持 Chat Completions 的端点。该适配器支持普通答复和函数工具调用，并在后续工具回合保留提供方要求的推理上下文。API 地址可写为 `/v1` 基址或完整的 `/chat/completions` 地址。设备外的端点使用 HTTPS。
 
+`ChatCompletionsModel::list_models(base, api_key)` 查询同一 API 基址下的 `/models` 并返回模型 ID。未实现该端点的服务仍可通过指定模型 ID 连接。列表请求和生成请求都不进入网络录制。
+
 ```rust
 use std::sync::Arc;
 
@@ -44,3 +46,7 @@ let mut index = SearchIndex::default();
 let source = index.add("人物笔记", "鹰纹银匣由晏澄保管。");
 assert_eq!(index.search("鹰纹银匣", 3), vec![source]);
 ```
+
+## 检查生成文本的重复段落
+
+`repetition::find_repetition` 可在预览阶段查找结果中重复或来自参考稿的长文本。它忽略大小写、空白和标点，返回结果原文中的 UTF-8 范围，便于界面定位。调用方决定参考稿范围以及如何提示作者。

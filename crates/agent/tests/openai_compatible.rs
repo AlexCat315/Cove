@@ -136,3 +136,46 @@ fn model_configuration_rejects_malformed_or_insecure_endpoints() {
     assert!(ChatCompletionsModel::new("https://example.org/v1", "my-model", None).is_ok());
     assert!(ChatCompletionsModel::new("https://example.org/v1", "", None).is_err());
 }
+
+#[test]
+fn discovers_models_at_the_same_api_base_with_the_supplied_credentials() {
+    let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+    let completions = format!(
+        "http://{}/v1/chat/completions",
+        listener.local_addr().unwrap()
+    );
+    let server = std::thread::spawn(move || {
+        let (mut stream, _) = listener.accept().unwrap();
+        stream
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .unwrap();
+        let mut reader = BufReader::new(&mut stream);
+        let mut line = String::new();
+        reader.read_line(&mut line).unwrap();
+        assert!(line.starts_with("GET /v1/models "));
+        let mut authorized = false;
+        loop {
+            line.clear();
+            assert_ne!(reader.read_line(&mut line).unwrap(), 0);
+            if line == "\r\n" {
+                break;
+            }
+            if let Some((name, value)) = line.split_once(':')
+                && name.eq_ignore_ascii_case("authorization")
+            {
+                authorized = value.trim() == "Bearer catalog-test-key";
+            }
+        }
+        assert!(authorized);
+        let body = r#"{"data":[{"id":"review"},{"id":"draft"},{"id":"draft"},{"id":""}]}"#;
+        write!(
+            stream,
+            "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+            body.len()
+        )
+        .unwrap();
+    });
+    let models = ChatCompletionsModel::list_models(&completions, Some("catalog-test-key")).unwrap();
+    assert_eq!(models, ["draft", "review"]);
+    server.join().unwrap();
+}

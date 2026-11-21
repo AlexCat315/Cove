@@ -6,6 +6,7 @@
 mod mcp;
 #[cfg(feature = "openai-compatible")]
 pub mod openai_compatible;
+pub mod repetition;
 pub mod retrieval;
 mod schema;
 mod skills;
