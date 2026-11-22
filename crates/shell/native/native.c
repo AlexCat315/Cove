@@ -31,8 +31,10 @@ static uint16_t modifiers(SDL_Keymod value) {
 bool cove_shell_init(void) {
     if (SDL_GetAtomicInt(&initialized)) return true;
     if (!SDL_IsMainThread()) return SDL_SetError("Cove shell must be initialized on the application main thread");
-    /* Windows: SDL3 declares per-monitor-v2 DPI awareness by default, and
-       3.4 no longer exports the hint macro. */
+#if defined(_WIN32)
+    /* Cove draws marked text inline. Windows still provides candidate UI. */
+    SDL_SetHint(SDL_HINT_IME_IMPLEMENTED_UI,"composition");
+#endif
 #if defined(__APPLE__)
     SDL_SetHint("SDL_MAC_SCROLL_MOMENTUM","1");
 #endif
@@ -435,7 +437,16 @@ void cove_shell_text_area(CoveShellWindow *h,const float *area){ COVE_ASSERT_MAI
        the IME composition string and candidate window at 1/scale of the caret
        on a 150%/200% display. macOS and Linux report scale 1.0 here. */
     const float scale=coordinate_scale(SDL_GetWindowID(h->window));
-    SDL_Rect r={(int)fmaxf(0,floorf(area[0]*scale)),(int)fmaxf(0,floorf(area[1]*scale)),(int)fmaxf(1,ceilf(area[2]*scale)),(int)fmaxf(1,ceilf(area[3]*scale))};if(!SDL_TextInputActive(h->window))SDL_StartTextInput(h->window);SDL_SetTextInputArea(h->window,&r,(int)fmaxf(0,roundf(area[4]*scale)));}
+    SDL_Rect r={(int)fmaxf(0,floorf(area[0]*scale)),(int)fmaxf(0,floorf(area[1]*scale)),(int)fmaxf(1,ceilf(area[2]*scale)),(int)fmaxf(1,ceilf(area[3]*scale))};
+    int cursor=(int)fmaxf(0,roundf(area[4]*scale));
+#if defined(_WIN32)
+    /* IMM treats the rectangle as an exclusion zone. Exclude only the caret
+       line at the insertion point, so the popup can sit beside or below it. */
+    r.x+=cursor; r.w=1; cursor=0;
+#endif
+    if(!SDL_TextInputActive(h->window))SDL_StartTextInput(h->window);
+    SDL_SetTextInputArea(h->window,&r,cursor);
+}
 void cove_shell_keyboard(CoveShellWindow *h,bool show){ COVE_ASSERT_MAIN();if(!h)return;if(show){if(!SDL_TextInputActive(h->window))SDL_StartTextInput(h->window);}else SDL_StopTextInput(h->window);}
 float cove_shell_keyboard_height(void){
 #if defined(__APPLE__)

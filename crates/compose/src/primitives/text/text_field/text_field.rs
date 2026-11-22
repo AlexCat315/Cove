@@ -2216,13 +2216,17 @@ fn install_interaction(
                     .nth(offset.max(0) as usize)
                     .map_or(event.text.len(), |(byte, _)| byte)
             };
-            let first_byte = scalar_byte(event.start);
+            let first_byte = if event.start < 0 {
+                event.text.len()
+            } else {
+                scalar_byte(event.start)
+            };
             let last_byte = scalar_byte(event.start.max(0).saturating_add(event.length.max(0)));
             let mut start = pending.character_index_for_utf8_offset(first_byte);
             if pending.utf8_offset_for_character_index(start) > first_byte {
                 start = start.saturating_sub(1);
             }
-            let end = if event.length <= 0 {
+            let end = if event.start < 0 || event.length <= 0 {
                 start
             } else {
                 pending.character_index_for_utf8_offset(last_byte)
@@ -3388,7 +3392,7 @@ fn render(
         );
     }
 
-    // Selection band under the glyphs.
+    // Marked text uses a thin underline, distinct from a committed selection.
     if let Some((low, high)) = render_state
         .composition_range
         .or_else(|| state.selection_range())
@@ -3405,7 +3409,12 @@ fn render(
             line_height,
             low,
             high,
-            color.multiplied_alpha(node.opacity()),
+            if render_state.is_composing {
+                theme.colors.accent.multiplied_alpha(node.opacity())
+            } else {
+                color.multiplied_alpha(node.opacity())
+            },
+            render_state.is_composing,
         );
     }
 
@@ -3677,6 +3686,7 @@ fn draw_range(
     low: usize,
     high: usize,
     color: Color,
+    underline: bool,
 ) {
     let lower = buffer.utf8_offset_for_character_index(low);
     let upper = buffer.utf8_offset_for_character_index(high);
@@ -3697,16 +3707,18 @@ fn draw_range(
             x_high += (line_height * 0.25).max(2.0);
         }
         if overlaps_text || selects_line_break {
-            crate::primitives::text::selection_input::paint_selection(
-                list,
-                Rect::new(
-                    text_origin.x + x_low,
-                    text_origin.y + line.top_y,
-                    (x_high - x_low).max(1.0),
-                    line_height,
-                ),
-                color,
-            );
+            let x = text_origin.x + x_low;
+            let y = text_origin.y + line.top_y;
+            let width = (x_high - x_low).max(1.0);
+            if underline {
+                let _ = list.add_rect(Rect::new(x, y + line_height - 2.0, width, 1.0), color);
+            } else {
+                crate::primitives::text::selection_input::paint_selection(
+                    list,
+                    Rect::new(x, y, width, line_height),
+                    color,
+                );
+            }
         }
     }
 }

@@ -1299,7 +1299,7 @@ impl Application {
         }
         let mut typography = state.typography.borrow_mut();
         typography.scale = scale;
-        let atlas_edge = ((1024.0 * scale).ceil() as usize).max(1024);
+        let atlas_edge = ((1536.0 * scale).ceil() as usize).clamp(1536, 8192);
         let environment = TextEnvironment::bootstrapped(TextBootstrapOptions {
             atlas_texture_id: typography.texture_id,
             primary_font_name: state.config.typography.primary_font_name.clone(),
@@ -1638,17 +1638,14 @@ impl Application {
         );
         let layout_end = Instant::now();
 
-        {
-            let mut list = state.composition.draw_list.borrow_mut();
-            list.reset();
-            // Edges are snapped to the physical pixel grid as they are emitted;
-            // see `DrawList::pixel_scale`. Set before drawing, not at record time.
-            list.pixel_scale = state.host.content_scale_factor();
-        }
         let draw_trace = timeline.borrow().begin();
         let mut layer_census = None;
-        {
+        let atlas = state.typography.borrow().atlas.clone();
+        for attempt in 0..2 {
             let mut list = state.composition.draw_list.borrow_mut();
+            list.reset();
+            // Snap edges to the physical pixel grid as they are emitted.
+            list.pixel_scale = state.host.content_scale_factor();
             if state.composition.use_legacy_renderer {
                 state.composition.node_renderer.render(&root, &mut list);
             } else if state.diagnostics.borrow().dev_tools.is_some() {
@@ -1676,6 +1673,21 @@ impl Application {
                 state.performance_hud.borrow_mut().draw(&mut list);
             }
             self.with_diagnostics(|session| session.overlay(&mut list));
+            drop(list);
+            if attempt == 0
+                && let Some(atlas) = &atlas
+                && atlas.is_full()
+            {
+                // An old glyph's UVs stop being valid after reset. Re-record
+                // cached layers before uploading or submitting the new atlas.
+                atlas.reset();
+                state.composition.graph.render_tree().trim_caches();
+                for window in state.auxiliary_windows.borrow().values() {
+                    window.trim_memory();
+                }
+            } else {
+                break;
+            }
         }
         if let Some(census) = layer_census.as_ref() {
             self.with_diagnostics(|session| session.layers_composited(census));

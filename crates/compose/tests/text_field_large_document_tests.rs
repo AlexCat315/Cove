@@ -139,6 +139,52 @@ fn document(node: &Node) -> Option<Rc<RefCell<TextDocumentLayout>>> {
 }
 
 #[test]
+fn inline_composition_replaces_placeholder_and_anchors_at_its_native_caret() {
+    with_scene(|scene| {
+        let store = Arc::new(Mutex::new(TextBuffer::empty()));
+        scene.graph.install(
+            TextField::new("开始写作…", store_binding(&store))
+                .multiline()
+                .frame_size(320.0, 160.0),
+            Default::default(),
+        );
+        scene.graph.compute_layout(320.0, 160.0);
+        let node = field_node(&scene.graph);
+        FocusChainHolder::current()
+            .unwrap()
+            .focus(Some(&node), true);
+        let handlers = scene.registry.handlers(&node);
+        let editing = handlers.editing.unwrap();
+        let resolve = node
+            .attachment::<cove_core::scene::TextInputAreaResolver>(
+                TextInputAttachmentKey::AREA_RESOLVER,
+            )
+            .unwrap();
+        let anchor = |start| {
+            editing(
+                &TextEditingEvent {
+                    text: "nihao".into(),
+                    start,
+                    length: 0,
+                },
+                EventPhase::Target,
+            );
+            draw(&node);
+            let snapshot = node
+                .attachment::<cove_core::scene::TextInputClient>(TextInputAttachmentKey::CLIENT)
+                .unwrap();
+            assert_eq!((snapshot.snapshot)().text, "nihao");
+            resolve(&node, Point::default()).unwrap().cursor_x
+        };
+        assert!(anchor(2) < anchor(5));
+        assert_eq!(anchor(-1), anchor(5));
+        assert!(store.lock().unwrap().is_empty());
+        (handlers.text.unwrap())("你好", EventPhase::Target);
+        assert_eq!(store.lock().unwrap().string_value(), "你好");
+    });
+}
+
+#[test]
 fn horizontal_caret_reveal() {
     with_scene(|scene| {
         let store = Arc::new(Mutex::new(TextBuffer::new(

@@ -217,18 +217,14 @@ pub fn make_render_state(
     };
     let start_byte = current.utf8_offset_for_character_index(range.0);
     let end_byte = start_byte + composition.text.len();
-    let count = composition.text.graphemes(true).count();
-    let offset = if composition.length > 0 {
-        composition.start + composition.length
-    } else {
-        count
-    };
-    let prefix: String = composition
+    let offset = composition.start.saturating_add(composition.length);
+    let prefix_bytes: usize = composition
         .text
         .graphemes(true)
-        .take(offset.min(count))
-        .collect();
-    let caret_byte = start_byte + prefix.len();
+        .take(offset)
+        .map(str::len)
+        .sum();
+    let caret_byte = start_byte + prefix_bytes;
     let mut first = preview.character_index_for_utf8_offset(start_byte);
     if preview.utf8_offset_for_character_index(first) > start_byte {
         first = first.saturating_sub(1);
