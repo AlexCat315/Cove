@@ -962,8 +962,8 @@ impl PrimitiveView for TextFieldHost {
             }
             let buffer = state_handle.borrow().buffer.clone();
             self.field.text.set(buffer.clone());
-            if let Some(handler) = node.attachment::<Rc<dyn Fn(&TextBuffer)>>("__textfield_change")
-            {
+            // On first mount, input handlers have not been attached yet.
+            if let Some(handler) = &self.field.events.on_change {
                 handler(&buffer);
             }
             notify_caret(node, &state_handle);

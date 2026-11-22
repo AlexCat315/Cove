@@ -545,6 +545,11 @@ fn edit_request_applies_once_and_is_undoable() {
     with_scene(Some(test_text_environment(16.0, 20.0)), |scene| {
         let store = Arc::new(Mutex::new(TextBuffer::new("hello world")));
         let mut field = TextField::new("", store_binding(&store));
+        let changes = Rc::new(RefCell::new(Vec::new()));
+        let observed = changes.clone();
+        field.events.on_change = Some(Rc::new(move |buffer| {
+            observed.borrow_mut().push(buffer.string_value());
+        }));
         field.edit_request = Some(TextFieldEditRequest {
             id: 1,
             range: 0..5,
@@ -558,6 +563,7 @@ fn edit_request_applies_once_and_is_undoable() {
         scene.graph.compute_layout(300.0, 60.0);
         scene.graph.compute_layout(300.0, 60.0);
         assert_eq!(store.lock().unwrap().string_value(), "HI world");
+        assert_eq!(changes.borrow().as_slice(), ["HI world"]);
         let node = field_node(&scene.graph);
         let state = state_of(&node).unwrap();
         assert_eq!(state.borrow().selection.cursor_index, 2);
@@ -569,6 +575,7 @@ fn edit_request_applies_once_and_is_undoable() {
             "hello world",
             "the request joined the undo history"
         );
+        assert_eq!(changes.borrow().as_slice(), ["HI world", "hello world"]);
     });
 }
 

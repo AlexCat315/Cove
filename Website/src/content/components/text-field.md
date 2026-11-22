@@ -38,6 +38,8 @@ fn editor(cx: &Scope) -> impl View {
 
 字段同时发布 `TextEditActions`，菜单栏的撤销/重做项和场景级快捷键读取同一份历史，不会把 Primary-Z 漏给外层快捷键宿主。
 
+`TextFieldEditRequest` 会更新绑定、调用 `on_change`，并作为一步加入撤销历史。首次显示字段时提交的请求也会调用 `on_change`。
+
 ## 多行测量与滚动
 
 垂直字段按行盒测量，随内容增高到 `max_visible_lines`，之后固定高度并滚动。显式换行也会让默认横向字段增高，直到同一个上限。滚动到上限后，滚轮以 `MULTILINE_WHEEL_STEP`（30pt）为一格移动视口；未溢出时滚轮继续传给外层滚动视图。

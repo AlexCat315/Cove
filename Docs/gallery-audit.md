@@ -86,6 +86,12 @@ Windows 与 Linux 控制器交叉检查通过。两个平台的宿主交叉检�
 | Gallery / Drag & Drop | MCP 读取 Browse files 节点。操作期间的 CPU trace 可分页读取。 | Windows 通过系统鼠标打开文件面板，经 UI Automation 点击「取消」，再次枚举确认面板关闭。 | [Drag & Drop](../Website/src/content/components/drag-and-drop.md) |
 | Browser / Counter | Windows 无头 Edge 注册共享探针，Edge WebDriver 通过控制器抓取视口截图并点击 DOM 控件，Counter 由 0 变为 1。 | 物理触控板、软键盘和 IME 候选位置仍待实机验收。 | [Gallery](../Website/src/content/components/gallery.md) |
 
+## 2026-11-22 TextField 首次显示编辑请求
+
+| 页面或组件 | 实现与自动化验收 | 原生验收 | Rust 文档 |
+| --- | --- | --- | --- |
+| TextField | 导航测试覆盖首次显示时的编辑通知、重复布局与一步撤销。 | macOS Ruwriter 从 Markdown 预览应用文本格式化，确认保存和撤销均写入文件。 | [TextField](../Website/src/content/components/text-field.md) |
+
 ## 2026-11-12 浏览器宿主输入
 
 | 页面或组件 | 实现与自动化验收 | 浏览器实机验收 | Rust 文档 |
